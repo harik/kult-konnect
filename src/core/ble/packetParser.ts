@@ -62,25 +62,34 @@ export function parseScalePacket(data: Uint8Array): ParsedPacket | null {
     }
 
     const flags = data[1];
-    const hasHandles = (flags & 0x80) !== 0;
+    const hasHandles = (flags & 0x80) !== 0 || data[2] === 0x80 || data[2] === 0xC0;
 
     // uint16-LE: (byte 4 << 8) | byte 3
     const rawWeight = (data[4] << 8) | data[3];
     const weightKg = Number((rawWeight / 100.0).toFixed(2));
     const statusByte = data[9];
 
-    // Check if reserved bytes [5..8] contain heart rate BPM
+    // Heart rate extraction from 0xCF packet:
+    // Case A: Post-measurement pulse broadcast packet:
+    // When scale finishes BCG spinning, it transmits CF <BPM> C0 00 00 00 00 00 00 00 <CHK>
     let heartRateBpm: number | undefined = undefined;
-    for (let idx of [5, 6, 7, 8]) {
-      const val = data[idx];
-      if (val >= 45 && val <= 200) {
-        heartRateBpm = val;
-        break;
+    if (data[2] === 0xC0 && data[1] >= 40 && data[1] <= 220) {
+      heartRateBpm = data[1];
+    } else {
+      // Case B: Reserved bytes [5..8] in live weight stream
+      for (const idx of [5, 6, 7, 8]) {
+        const val = data[idx];
+        if (val >= 45 && val <= 200) {
+          heartRateBpm = val;
+          break;
+        }
       }
     }
 
     let status: LiveWeightPacket['status'] = 'unknown';
-    if (statusByte === 0x01) {
+    if (data[2] === 0xC0) {
+      status = 'stable_complete';
+    } else if (statusByte === 0x01) {
       status = 'unstable';
     } else if (statusByte === 0x00) {
       status = 'stable_weight_only';

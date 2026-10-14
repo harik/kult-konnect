@@ -175,10 +175,18 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     if (!packet) return;
 
     if (packet.type === 'live_weight') {
-      this.pendingWeight = packet.weightKg;
+      if (packet.weightKg > 0) {
+        this.pendingWeight = packet.weightKg;
+      }
       if (packet.heartRateBpm) {
         this.pendingHeartRate = packet.heartRateBpm;
-        console.log(`[BLE Driver] Heart rate in live weight: ${packet.heartRateBpm} BPM`);
+        console.log(`[BLE Driver] Heart rate captured: ${packet.heartRateBpm} BPM`);
+      }
+
+      // If we received the post-measurement heart rate packet, finalize immediately!
+      if (packet.heartRateBpm && this.pendingWeight > 0) {
+        this.finalizeMeasurement();
+        return;
       }
 
       if (packet.status === 'unstable') {
@@ -192,7 +200,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         });
       } else if (packet.status === 'stable_weight_only') {
         this.notifyState('completed', {
-          weightKg: packet.weightKg,
+          weightKg: this.pendingWeight || packet.weightKg,
           isStable: true,
           hasHandles: false,
           impedanceReceived: false,
@@ -204,7 +212,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         }
       } else if (packet.status === 'measuring_impedance') {
         this.notifyState('measuring_impedance', {
-          weightKg: packet.weightKg,
+          weightKg: this.pendingWeight || packet.weightKg,
           isStable: true,
           hasHandles: true,
           impedanceReceived: false,
@@ -213,7 +221,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         });
       } else if (packet.status === 'measuring_heart_rate') {
         this.notifyState('measuring_heart_rate', {
-          weightKg: packet.weightKg,
+          weightKg: this.pendingWeight || packet.weightKg,
           isStable: true,
           hasHandles: true,
           impedanceReceived: true,
@@ -223,7 +231,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         });
       } else if (packet.status === 'stable_complete') {
         this.notifyState('measuring_impedance', {
-          weightKg: packet.weightKg,
+          weightKg: this.pendingWeight || packet.weightKg,
           isStable: true,
           hasHandles: true,
           impedanceReceived: true,

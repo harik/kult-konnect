@@ -121,4 +121,19 @@ describe('Cult Smart Scale Pro BLE Packet Parser', () => {
       expect(packet.heartRateBpm).toBe(74);
     }
   });
+
+  it('parses post-BCG pulse completion broadcast packet (CF 51 C0 ...)', () => {
+    // Exact packet captured from physical Cult Smart Scale Pro:
+    // CF 51 C0 00 00 00 00 00 00 00 5E (0x51 = 81 BPM)
+    const bytes = new Uint8Array([
+      0xCF, 0x51, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5E,
+    ]);
+    const packet = parseScalePacket(bytes);
+    expect(packet?.type).toBe('live_weight');
+    if (packet && packet.type === 'live_weight') {
+      expect(packet.heartRateBpm).toBe(81);
+      expect(packet.status).toBe('stable_complete');
+      expect(packet.hasHandles).toBe(true);
+    }
+  });
 });

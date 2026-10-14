@@ -190,7 +190,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
           />
 
           <span className="text-5xl font-extrabold tracking-tight text-white font-mono">
-            {status.weightKg > 0 ? status.weightKg.toFixed(1) : '--.-'}
+            {finalResult ? finalResult.weightKg.toFixed(1) : status.weightKg > 0 ? status.weightKg.toFixed(1) : '--.-'}
           </span>
           <span className="text-sm font-medium uppercase tracking-wider text-slate-400 mt-1">kg</span>
 
@@ -238,6 +238,11 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
           {status.state === 'completed' && (
             <p className="text-emerald-400 text-sm font-semibold flex items-center justify-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" /> Weigh-in complete!
+            </p>
+          )}
+          {status.state === 'disconnected' && !finalResult && (
+            <p className="text-slate-400 text-sm flex items-center justify-center gap-1.5">
+              <RefreshCw className="w-4 h-4" /> Scale disconnected. Step on it to wake up.
             </p>
           )}
           {status.state === 'error' && (
