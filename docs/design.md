@@ -205,7 +205,31 @@ export interface ScaleMeasurement {
 
 ---
 
-## 6. Comprehensive Test Strategy
+## 6. Google Drive Backup & Restore Architecture
+
+To provide seamless, privacy-preserving cross-device sync and disaster recovery without requiring a dedicated backend server, Kult Konnect integrates directly with the **Google Drive AppData folder** (`drive.appdata`).
+
+### 6.1 Design Principles
+1. **Zero-Knowledge to Third Parties**: Backups are written directly from the user's phone to the user's personal Google Drive using Google OAuth2.
+2. **AppData Isolation**: Kult Konnect uses the `https://www.googleapis.com/auth/drive.appdata` scope. The app can only see and modify its own configuration and backup files, ensuring zero access to user personal documents/photos on Drive.
+3. **Payload Structure**:
+   ```typescript
+   export interface DriveBackupPayload {
+     version: 1;
+     exportedAt: number;
+     deviceInfo: string;
+     profiles: UserProfile[];
+     measurements: ScaleMeasurement[];
+     checksum: string; // SHA-256 for integrity verification
+   }
+   ```
+4. **Conflict Resolution & Merge**:
+   - Merge strategy uses primary keys (`id`) and timestamps (`updatedAt`).
+   - If a measurement with the same ID already exists, the record with the most recent `timestamp` is preserved.
+
+---
+
+## 7. Comprehensive Test Strategy
 
 The test strategy covers hardware-independent logic, mock simulation, and physical hardware-in-the-loop (HIL) testing.
 
