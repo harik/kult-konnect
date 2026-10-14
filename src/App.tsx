@@ -8,6 +8,7 @@ import { TrendCharts } from './components/TrendCharts';
 import { HistoryList } from './components/HistoryList';
 import { WeighInModal } from './components/WeighInModal';
 import { ProfileModal } from './components/ProfileModal';
+import { ProfileSetupModal } from './components/ProfileSetupModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Scale, LineChart, History, Settings, ChevronDown, Sparkles } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export function App() {
   const [isWeighInOpen, setIsWeighInOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
 
   // Scale Driver Mode
   const [isMockMode, setIsMockMode] = useState(false);
@@ -40,12 +42,25 @@ export function App() {
       .sortBy('timestamp');
   }, [activeProfile?.id]) || [];
 
-  // Ensure default profile exists on first launch
+  // Check if user has completed profile setup
   useEffect(() => {
+    const hasSetup = localStorage.getItem('kult_has_configured_profile');
+    if (!hasSetup) {
+      setIsSetupModalOpen(true);
+    }
     ensureDefaultProfile().then((p) => {
       if (!activeProfile) setActiveProfile(p);
     });
   }, []);
+
+  const handleTriggerWeighIn = () => {
+    const hasSetup = localStorage.getItem('kult_has_configured_profile');
+    if (!hasSetup) {
+      setIsSetupModalOpen(true);
+      return;
+    }
+    setIsWeighInOpen(true);
+  };
 
   const latestMeasurement = measurements.length > 0 ? measurements[0] : null;
   const previousMeasurement = measurements.length > 1 ? measurements[1] : null;
@@ -93,7 +108,7 @@ export function App() {
             latestMeasurement={latestMeasurement}
             previousMeasurement={previousMeasurement}
             currentProfile={activeProfile || ({} as UserProfile)}
-            onStartWeighIn={() => setIsWeighInOpen(true)}
+            onStartWeighIn={handleTriggerWeighIn}
           />
         )}
 
@@ -112,7 +127,7 @@ export function App() {
       {/* Floating Start Weigh-in Action Bar */}
       <div className="fixed bottom-16 inset-x-0 z-30 flex justify-center p-4 pointer-events-none">
         <button
-          onClick={() => setIsWeighInOpen(true)}
+          onClick={handleTriggerWeighIn}
           className="pointer-events-auto bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white font-bold py-3.5 px-8 rounded-full shadow-2xl shadow-brand-500/40 flex items-center gap-2.5 transition active:scale-95 border border-brand-400/30"
         >
           <Scale className="w-5 h-5" />
@@ -190,6 +205,14 @@ export function App() {
           onDataImported={() => {}}
         />
       )}
+
+      <ProfileSetupModal
+        isOpen={isSetupModalOpen}
+        onProfileCreated={(p) => {
+          setActiveProfile(p);
+          setIsSetupModalOpen(false);
+        }}
+      />
     </div>
   );
 }

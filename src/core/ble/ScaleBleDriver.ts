@@ -47,16 +47,60 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
       
       await BleClient.initialize();
 
-      // Scan for devices advertising 0xFFF0 or named Cult / Scale
-      const device = await BleClient.requestDevice({
-        services: [CULT_SCALE_SERVICE_UUID],
-        optionalServices: [],
-      });
+      // Ensure Bluetooth is turned on
+      const isBtEnabled = await BleClient.isEnabled();
+      if (!isBtEnabled) {
+        try {
+          await BleClient.requestEnable();
+        } catch (e) {
+          console.warn('[BLE Driver] Bluetooth enable request rejected or dismissed');
+        }
+      }
 
-      this.activeDeviceId = device.deviceId;
-      this.notifyState('connecting', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 25 });
+      let deviceId: string | null = null;
 
-      await BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
+      // 1. Try automatic LE scanning (user steps on scale, wakes up BLE)
+      try {
+        await new Promise<void>(async (resolve, reject) => {
+          const timeout = setTimeout(async () => {
+            try { await BleClient.stopLEScan(); } catch {}
+            resolve();
+          }, 12000);
+
+          try {
+            await BleClient.requestLEScan({ allowDuplicates: false }, async (scanResult) => {
+              const name = (scanResult.device.name || '').toLowerCase();
+              const hasScaleService = scanResult.uuids?.some((u) => u.toLowerCase().includes('fff0'));
+
+              if (hasScaleService || name.includes('cult') || name.includes('scale')) {
+                clearTimeout(timeout);
+                deviceId = scanResult.device.deviceId;
+                try { await BleClient.stopLEScan(); } catch {}
+                resolve();
+              }
+            });
+          } catch (scanErr) {
+            clearTimeout(timeout);
+            reject(scanErr);
+          }
+        });
+      } catch (scanErr) {
+        console.warn('[BLE Driver] requestLEScan not supported or failed, using requestDevice fallback:', scanErr);
+      }
+
+      // 2. If auto-scan did not lock onto the scale, trigger native device picker dialog
+      if (!deviceId) {
+        const device = await BleClient.requestDevice({
+          services: [CULT_SCALE_SERVICE_UUID],
+          optionalServices: [],
+        });
+        deviceId = device.deviceId;
+      }
+
+      this.activeDeviceId = deviceId;
+      this.notifyState('connecting', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 30 });
+
+      await BleClient.connect(deviceId, (disconnectedDeviceId) => {
         console.log(`[BLE Driver] Device ${disconnectedDeviceId} disconnected`);
         this.handleDisconnectFallback();
       });
@@ -65,7 +109,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
 
       // Start notifications on 0xFFF4
       await BleClient.startNotifications(
-        device.deviceId,
+        deviceId,
         CULT_SCALE_SERVICE_UUID,
         CULT_SCALE_NOTIFY_UUID,
         (value) => {
