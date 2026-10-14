@@ -21,6 +21,7 @@ It replaces generic and unreliable alternatives with a tailored BLE driver, comp
   - Fast, zero-config local storage with IndexedDB (Dexie.js).
   - Private by design: all health data stays strictly on your device unless synced to Health Connect.
   - JSON and CSV data export/import for backups and portability.
+  - Optional automatic backup to (and restore from) Google Drive
 - **Interactive Health Analytics & Trends**:
   - Timeframe toggles (7D, 30D, 90D, 1Y, All-time).
   - 7-day rolling moving average to filter out natural daily water weight fluctuations.
