@@ -55,6 +55,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({ measurements, onRefres
                     {m.bodyFatPercent.toFixed(1)}% Fat
                   </span>
                 )}
+
+                {m.heartRateBpm !== undefined && (
+                  <span className="text-xs font-medium text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded-md ml-1">
+                    ♥ {m.heartRateBpm} BPM
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">

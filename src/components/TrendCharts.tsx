@@ -29,7 +29,7 @@ interface TrendChartsProps {
 }
 
 type Timeframe = '7D' | '30D' | '90D' | '1Y' | 'ALL';
-type MetricKey = 'weightKg' | 'bodyFatPercent' | 'musclePercent' | 'waterPercent' | 'bmrKcal';
+type MetricKey = 'weightKg' | 'bodyFatPercent' | 'musclePercent' | 'waterPercent' | 'bmrKcal' | 'heartRateBpm';
 
 export const TrendCharts: React.FC<TrendChartsProps> = ({ measurements }) => {
   const [timeframe, setTimeframe] = useState<Timeframe>('30D');
@@ -60,6 +60,7 @@ export const TrendCharts: React.FC<TrendChartsProps> = ({ measurements }) => {
     musclePercent: { label: 'Muscle', unit: '%', color: '#34d399', bg: 'rgba(52, 211, 153, 0.1)' },
     waterPercent: { label: 'Body Water', unit: '%', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' },
     bmrKcal: { label: 'BMR', unit: 'kcal', color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)' },
+    heartRateBpm: { label: 'Heart Rate', unit: 'BPM', color: '#f43f5e', bg: 'rgba(244, 63, 94, 0.1)' },
   };
 
   const currentConfig = metricConfigs[selectedMetric];

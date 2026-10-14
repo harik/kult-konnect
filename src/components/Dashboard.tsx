@@ -109,32 +109,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Resting Heart Rate Card (from scale BCG measurement) */}
-      {latestMeasurement.heartRateBpm && (
-        <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-5 shadow-xl flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-rose-500/15 text-rose-400 rounded-2xl border border-rose-500/20">
-              <HeartPulse className="w-6 h-6 animate-pulse" />
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Resting Heart Rate
-              </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-3xl font-extrabold text-white font-mono">
-                  {latestMeasurement.heartRateBpm}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">BPM</span>
-              </div>
-            </div>
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <div className={`p-3 rounded-2xl border ${
+            latestMeasurement.heartRateBpm 
+              ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' 
+              : 'bg-slate-800 text-slate-500 border-slate-700'
+          }`}>
+            <HeartPulse className="w-6 h-6" />
           </div>
-          <div className="text-right">
-            <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20">
-              Scale BCG Pulse
+          <div>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+              Resting Heart Rate
             </span>
-            <span className="block text-[10px] text-slate-500 mt-1">Resting Vital</span>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className="text-3xl font-extrabold text-white font-mono">
+                {latestMeasurement.heartRateBpm || '--'}
+              </span>
+              <span className="text-xs font-semibold text-slate-400">BPM</span>
+            </div>
           </div>
         </div>
-      )}
+        <div className="text-right">
+          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${
+            latestMeasurement.heartRateBpm 
+              ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' 
+              : 'text-slate-400 bg-slate-800 border-slate-700'
+          }`}>
+            {latestMeasurement.heartRateBpm ? 'Scale BCG Pulse' : 'Not Captured'}
+          </span>
+          <span className="block text-[10px] text-slate-500 mt-1">
+            {latestMeasurement.heartRateBpm ? 'Resting Vital' : 'Hold stance during spin'}
+          </span>
+        </div>
+      </div>
 
       {/* Segmental Analysis (5 Zones: Arms, Torso, Legs) */}
       {latestMeasurement.segmental && (

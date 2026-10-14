@@ -168,6 +168,9 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
   }
 
   private handlePacket(bytes: Uint8Array) {
+    const rawHex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    console.log(`[BLE Driver] Packet: ${rawHex}`);
+
     const packet = parseScalePacket(bytes);
     if (!packet) return;
 
@@ -175,6 +178,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
       this.pendingWeight = packet.weightKg;
       if (packet.heartRateBpm) {
         this.pendingHeartRate = packet.heartRateBpm;
+        console.log(`[BLE Driver] Heart rate in live weight: ${packet.heartRateBpm} BPM`);
       }
 
       if (packet.status === 'unstable') {
@@ -214,7 +218,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
           hasHandles: true,
           impedanceReceived: true,
           heartRateBpm: this.pendingHeartRate,
-          progressPercent: 85,
+          progressPercent: 88,
           stepMessage: 'Measuring resting pulse... Scale is spinning',
         });
       } else if (packet.status === 'stable_complete') {
@@ -235,7 +239,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     } else if (packet.type === 'completion') {
       this.bodyCompPacketCount++;
       // When body comp is done, the scale screen begins spinning to measure heart rate!
-      // Do NOT disconnect! Give it 7 seconds to measure pulse / BCG.
+      // Do NOT disconnect! Give it up to 12 seconds to measure pulse / BCG.
       if (this.bodyCompPacketCount >= 4 && !this.heartRateTimeout) {
         this.notifyState('measuring_heart_rate', {
           weightKg: this.pendingWeight,
@@ -244,15 +248,16 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
           impedanceReceived: true,
           heartRateBpm: this.pendingHeartRate,
           progressPercent: 88,
-          stepMessage: 'Measuring resting pulse rate... Hold still',
+          stepMessage: 'Measuring resting pulse rate... Hold still while scale spins',
         });
 
         this.heartRateTimeout = setTimeout(() => {
+          console.log('[BLE Driver] Heart rate wait window complete, finalizing measurement');
           this.finalizeMeasurement();
-        }, 6500);
+        }, 12000);
       }
     } else if (packet.type === 'heart_rate') {
-      console.log(`[BLE Driver] Pulse captured: ${packet.bpm} BPM`);
+      console.log(`[BLE Driver] Dedicated pulse captured: ${packet.bpm} BPM`);
       this.pendingHeartRate = packet.bpm;
       this.finalizeMeasurement();
     }
@@ -265,7 +270,7 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     this.notifyState('completed', {
       weightKg: this.pendingWeight,
       isStable: true,
-      hasHandles: true,
+      hasHandles: !!this.pendingImpedance,
       impedanceReceived: !!this.pendingImpedance,
       heartRateBpm: this.pendingHeartRate,
       progressPercent: 100,
@@ -287,22 +292,18 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
 
   private handleDisconnectFallback() {
     this.clearHeartRateTimer();
-    if (this.pendingWeight > 0 && this.bodyCompPacketCount < 4) {
-      console.warn('[BLE Driver] Disconnected mid-measurement, publishing fallback weight-only');
-      if (this.onResult) {
-        this.onResult({ weightKg: this.pendingWeight, hasBodyComp: false });
-      }
-    } else if (this.pendingWeight > 0) {
+    console.log(`[BLE Driver] Device disconnected. Weight=${this.pendingWeight}, Imp=${this.pendingImpedance}`);
+    if (this.pendingWeight > 0) {
       this.finalizeMeasurement();
+    } else {
+      this.notifyState('disconnected', {
+        weightKg: 0,
+        isStable: false,
+        hasHandles: false,
+        impedanceReceived: false,
+        progressPercent: 0,
+      });
     }
-
-    this.notifyState('disconnected', {
-      weightKg: this.pendingWeight,
-      isStable: false,
-      hasHandles: false,
-      impedanceReceived: false,
-      progressPercent: 0,
-    });
   }
 
   private notifyState(state: ScaleConnectionState, status: Omit<ScaleLiveStatus, 'state'>) {
@@ -322,13 +323,14 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     this.isRunning = false;
     this.clearHeartRateTimer();
     if (this.activeDeviceId) {
+      const devId = this.activeDeviceId;
+      this.activeDeviceId = null;
       try {
-        await BleClient.stopNotifications(this.activeDeviceId, CULT_SCALE_SERVICE_UUID, CULT_SCALE_NOTIFY_UUID);
-        await BleClient.disconnect(this.activeDeviceId);
+        await BleClient.stopNotifications(devId, CULT_SCALE_SERVICE_UUID, CULT_SCALE_NOTIFY_UUID);
+        await BleClient.disconnect(devId);
       } catch (e) {
         // ignore cleanup errors
       }
-      this.activeDeviceId = null;
     }
   }
 

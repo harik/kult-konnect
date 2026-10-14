@@ -129,20 +129,6 @@ export function parseScalePacket(data: Uint8Array): ParsedPacket | null {
   // 3. Body comp completion signal (0xDF, 17 bytes)
   if (packetType === 0xDF) {
     if (data.length < 4) return null;
-
-    // Check if trailing bytes contain heart rate
-    let bpm: number | undefined = undefined;
-    for (let i = 4; i < data.length; i++) {
-      if (data[i] >= 45 && data[i] <= 200) {
-        bpm = data[i];
-        break;
-      }
-    }
-
-    if (bpm) {
-      return { type: 'heart_rate', bpm };
-    }
-
     return {
       type: 'completion',
       sequenceA: data[2],

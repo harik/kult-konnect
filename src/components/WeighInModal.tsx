@@ -159,7 +159,15 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
         {/* Header */}
         <div className="w-full flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Bluetooth className="w-5 h-5 text-brand-400 animate-pulse" />
+            <Bluetooth className={`w-5 h-5 transition-colors ${
+              status.state === 'scanning' || status.state === 'connecting'
+                ? 'text-brand-400 animate-pulse'
+                : status.state === 'completed'
+                ? 'text-emerald-400'
+                : status.state === 'error' || status.state === 'disconnected'
+                ? 'text-slate-500'
+                : 'text-brand-400'
+            }`} />
             <span className="font-semibold text-slate-200">Cult Smart Scale Pro</span>
           </div>
           <button
@@ -177,7 +185,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
         <div className="relative my-3 flex flex-col items-center justify-center w-52 h-52 rounded-full border-4 border-slate-800 bg-slate-950/70 shadow-inner">
           {/* Progress Ring Indicator */}
           <div
-            className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-500 transition-all duration-300"
+            className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-500 transition-transform duration-150 ease-out"
             style={{ transform: `rotate(${(status.progressPercent / 100) * 360}deg)` }}
           />
 
@@ -239,22 +247,26 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
           )}
         </div>
 
-        {/* Resting Heart Rate Card (if captured) */}
-        {finalResult && finalResult.heartRateBpm && (
-          <div className="w-full bg-rose-950/20 border border-rose-500/20 rounded-2xl p-3 my-2 flex items-center justify-between">
+        {/* Resting Heart Rate Card */}
+        {finalResult && (
+          <div className="w-full bg-slate-950/70 border border-slate-800 rounded-2xl p-3 my-2 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl">
-                <HeartPulse className="w-4 h-4 animate-pulse" />
+              <div className={`p-2 rounded-xl ${finalResult.heartRateBpm ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-800 text-slate-500'}`}>
+                <HeartPulse className="w-4 h-4" />
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 font-medium block">Resting Heart Rate</span>
                 <span className="text-lg font-bold text-white font-mono">
-                  {finalResult.heartRateBpm} <span className="text-xs text-slate-400 font-normal">BPM</span>
+                  {finalResult.heartRateBpm ? `${finalResult.heartRateBpm} BPM` : '-- BPM'}
                 </span>
               </div>
             </div>
-            <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full font-semibold border border-rose-500/20">
-              BCG Pulse
+            <span className={`text-[10px] px-2.5 py-1 rounded-full font-semibold border ${
+              finalResult.heartRateBpm
+                ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                : 'text-slate-400 bg-slate-800 border-slate-700'
+            }`}>
+              {finalResult.heartRateBpm ? 'BCG Pulse' : 'Not Captured'}
             </span>
           </div>
         )}

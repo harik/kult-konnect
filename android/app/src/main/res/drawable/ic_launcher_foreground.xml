@@ -1,0 +1,87 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Handlebar Retractable Rod -->
+    <path
+        android:pathData="M35,24 L73,24"
+        android:strokeColor="#64748B"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"/>
+
+    <!-- Handlebar Grip Contacts (Orange) -->
+    <path
+        android:pathData="M37,24 L45,24"
+        android:strokeColor="#F97316"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"/>
+    <path
+        android:pathData="M63,24 L71,24"
+        android:strokeColor="#F97316"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"/>
+
+    <!-- Retractable Cable from Scale to Handlebar -->
+    <path
+        android:pathData="M54,25 L54,32"
+        android:strokeColor="#475569"
+        android:strokeWidth="1.5"/>
+
+    <!-- Main Scale Platform (Rounded Glass Base) -->
+    <path
+        android:pathData="M32,32 L76,32 A8,8 0 0,1 84,40 L84,80 A8,8 0 0,1 76,88 L32,88 A8,8 0 0,1 24,80 L24,40 A8,8 0 0,1 32,32 Z"
+        android:fillColor="#1E293B"
+        android:strokeColor="#10B981"
+        android:strokeWidth="2.5"/>
+
+    <!-- LED Display Screen (Top Center) -->
+    <path
+        android:pathData="M43,36 L65,36 A2,2 0 0,1 67,38 L67,46 A2,2 0 0,1 65,48 L43,48 A2,2 0 0,1 41,46 L41,38 A2,2 0 0,1 43,36 Z"
+        android:fillColor="#090D16"/>
+
+    <!-- Glowing Cyan Digital LED Readout -->
+    <path
+        android:pathData="M45,42 L63,42"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"/>
+
+    <!-- 4 BIA Foot Electrodes (Curved Metallic Plates) -->
+    <!-- Top-Left Electrode -->
+    <path
+        android:pathData="M30,42 L38,42 A3,3 0 0,1 41,45 L41,53 A3,3 0 0,1 38,56 L30,56 A3,3 0 0,1 27,53 L27,45 A3,3 0 0,1 30,42 Z"
+        android:fillColor="#334155"
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="1"/>
+
+    <!-- Top-Right Electrode -->
+    <path
+        android:pathData="M70,42 L78,42 A3,3 0 0,1 81,45 L81,53 A3,3 0 0,1 78,56 L70,56 A3,3 0 0,1 67,53 L67,45 A3,3 0 0,1 70,42 Z"
+        android:fillColor="#334155"
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="1"/>
+
+    <!-- Bottom-Left Electrode -->
+    <path
+        android:pathData="M30,64 L38,64 A3,3 0 0,1 41,67 L41,75 A3,3 0 0,1 38,78 L30,78 A3,3 0 0,1 27,75 L27,67 A3,3 0 0,1 30,64 Z"
+        android:fillColor="#334155"
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="1"/>
+
+    <!-- Bottom-Right Electrode -->
+    <path
+        android:pathData="M70,64 L78,64 A3,3 0 0,1 81,67 L81,75 A3,3 0 0,1 78,78 L70,78 A3,3 0 0,1 67,75 L67,67 A3,3 0 0,1 70,64 Z"
+        android:fillColor="#334155"
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="1"/>
+
+    <!-- Center Pulse / Heart Wave -->
+    <path
+        android:pathData="M48,64 L51,64 L53,58 L55,70 L57,64 L60,64"
+        android:strokeColor="#10B981"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+</vector>
