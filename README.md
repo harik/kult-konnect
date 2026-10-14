@@ -45,8 +45,8 @@ It replaces generic and unreliable alternatives with a tailored BLE driver, comp
 
 ## Repository Documentation
 
-- [design.md](file:///Users/harikrishnar/projects/kult-konnect/design.md): In-depth system architecture, BLE protocol specifications, data schema, UI flows, and test strategy.
-- [instructions.md](file:///Users/harikrishnar/projects/kult-konnect/instructions.md): Step-by-step developer environment setup, build workflows, and debugging guide.
+- [design.md](file:///Users/harikrishnar/projects/kult-konnect/docs/design.md): In-depth system architecture, BLE protocol specifications, data schema, UI flows, and test strategy.
+- [instructions.md](file:///Users/harikrishnar/projects/kult-konnect/docs/instructions.md): Step-by-step developer environment setup, build workflows, and debugging guide.
 - [GEMINI.md](file:///Users/harikrishnar/projects/kult-konnect/GEMINI.md): Context, architectural guidelines, and codebase conventions for AI assistants.
 
 ---

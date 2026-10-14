@@ -61,6 +61,6 @@ Kult Konnect is an open-source, privacy-first mobile companion app built with **
 ---
 
 ## 4. Key References
-- [design.md](file:///Users/harikrishnar/projects/kult-konnect/design.md): In-depth system design, protocol layouts, data models, and test strategy.
-- [instructions.md](file:///Users/harikrishnar/projects/kult-konnect/instructions.md): Setup, build commands, and Android permission setup.
+- [design.md](file:///Users/harikrishnar/projects/kult-konnect/docs/design.md): In-depth system design, protocol layouts, data models, and test strategy.
+- [instructions.md](file:///Users/harikrishnar/projects/kult-konnect/docs/instructions.md): Setup, build commands, and Android permission setup.
 - [README.md](file:///Users/harikrishnar/projects/kult-konnect/README.md): Project summary and features.
