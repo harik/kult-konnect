@@ -2,6 +2,7 @@ import React from 'react';
 import { ScaleMeasurement, UserProfile } from '@/types';
 import { getBMICategory } from '@/core/bia/biaEngine';
 import { Flame, Droplets, Dumbbell, Activity, ShieldCheck, HeartPulse, Scale, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { SegmentalWidget } from './SegmentalWidget';
 
 interface DashboardProps {
   latestMeasurement: ScaleMeasurement | null;
@@ -106,6 +107,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Resting Heart Rate Card (from scale BCG measurement) */}
+      {latestMeasurement.heartRateBpm && (
+        <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-5 shadow-xl flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-rose-500/15 text-rose-400 rounded-2xl border border-rose-500/20">
+              <HeartPulse className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Resting Heart Rate
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-3xl font-extrabold text-white font-mono">
+                  {latestMeasurement.heartRateBpm}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">BPM</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20">
+              Scale BCG Pulse
+            </span>
+            <span className="block text-[10px] text-slate-500 mt-1">Resting Vital</span>
+          </div>
+        </div>
+      )}
+
+      {/* Segmental Analysis (5 Zones: Arms, Torso, Legs) */}
+      {latestMeasurement.segmental && (
+        <SegmentalWidget segmental={latestMeasurement.segmental} />
+      )}
 
       {/* Clinical Body Composition Metrics Grid */}
       <div>

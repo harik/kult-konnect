@@ -139,6 +139,19 @@ The scale's raw whole-body impedance (`imp[2]` from packet `0xBE`, Set A) is com
 7. **Basal Metabolic Rate (BMR, kcal/day)** (Katch-McArdle):
    $$\text{BMR} = 370 + 21.6 \times \text{FFM}$$
 
+### 3.1 Segmental Body Composition (5 Cylinders)
+The 8-electrode hardware records 10 raw impedance values in $0.1\,\Omega$ (`imp[0..9]`), allowing discrete derivation of fat and muscle mass across 5 anatomical zones:
+- **Right Arm (`imp[0]`) & Left Arm (`imp[1]`)**: Upper extremity lean/fat balance.
+- **Torso**: Central trunk mass accounting for $\approx 55\%$ of total fat and $\approx 58\%$ of FFM.
+- **Right Leg (`imp[3]`) & Left Leg (`imp[4]`)**: Lower extremity lean/fat balance.
+
+Relative electrical conductance $\sigma = \frac{1}{R}$ modulates individual limb lean mass allocation, while relative impedance modulates limb adiposity:
+$$\text{Fat}_{\text{arm}} = \text{Fat}_{\text{total}} \times 0.10 \times \frac{R_{\text{arm}}}{R_{\text{RA}} + R_{\text{LA}}}$$
+$$\text{Muscle}_{\text{arm}} = \text{FFM}_{\text{total}} \times 0.08 \times 0.55 \times \frac{\sigma_{\text{arm}}}{\sigma_{\text{RA}} + \sigma_{\text{LA}}}$$
+
+### 3.2 Resting Heart Rate Measurement (BCG)
+After completing 8-electrode bioimpedance, the scale begins spinning its display and measures micro-accelerations in load cells caused by aortic blood ejection (ballistocardiography). The driver maintains the BLE notification stream during `status = 0x06` / `0x09` (`measuring_heart_rate`) and captures the pulse rate ($\approx 45\text{--}200\,\text{BPM}$) without prematurely tearing down GATT connections.
+
 ---
 
 ## 4. Data Storage & Schema Design
@@ -159,12 +172,29 @@ export interface UserProfile {
   updatedAt: number;
 }
 
+export interface SegmentMetrics {
+  fatPercent: number;
+  fatKg: number;
+  muscleKg: number;
+}
+
+export interface SegmentalBreakdown {
+  rightArm: SegmentMetrics;
+  leftArm: SegmentMetrics;
+  torso: SegmentMetrics;
+  rightLeg: SegmentMetrics;
+  leftLeg: SegmentMetrics;
+}
+
 export interface ScaleMeasurement {
   id: string;                      // UUIDv4
   profileId: string;               // Foreign key -> UserProfile.id
   timestamp: number;               // Epoch timestamp (ms)
   weightKg: number;
   impedanceOhm?: number;
+  rawImpedances?: number[];        // All 10 raw frequency/limb impedance values
+  heartRateBpm?: number;           // Resting pulse from scale BCG
+  segmental?: SegmentalBreakdown;   // 5 anatomical zones
   bmi: number;
   bodyFatPercent?: number;
   musclePercent?: number;
@@ -179,6 +209,7 @@ export interface ScaleMeasurement {
     boneMass?: string;
     bmr?: string;
     leanBodyMass?: string;
+    heartRate?: string;
   };
   createdAt: number;
 }

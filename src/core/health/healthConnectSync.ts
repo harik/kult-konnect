@@ -25,7 +25,7 @@ export async function checkHealthConnectAvailability(): Promise<HealthSyncStatus
     }
 
     const auth = await Health.checkAuthorization({
-      write: ['weight', 'bodyFat', 'basalCalories'],
+      write: ['weight', 'bodyFat', 'basalCalories', 'heartRate'],
     });
 
     const isAuthorized = auth.writeAuthorized.includes('weight');
@@ -45,12 +45,12 @@ export async function checkHealthConnectAvailability(): Promise<HealthSyncStatus
 }
 
 /**
- * Requests write permissions for weight, body fat, and basal calories
+ * Requests write permissions for weight, body fat, basal calories, and heart rate
  */
 export async function requestHealthPermissions(): Promise<boolean> {
   try {
     const status = await Health.requestAuthorization({
-      write: ['weight', 'bodyFat', 'basalCalories'],
+      write: ['weight', 'bodyFat', 'basalCalories', 'heartRate'],
     });
     return status.writeAuthorized.includes('weight');
   } catch (err) {
@@ -109,6 +109,21 @@ export async function syncMeasurementToHealthConnect(measurement: ScaleMeasureme
         unit: 'kilocalorie',
         startDate: dateIso,
         endDate: dateIso,
+      });
+    }
+
+    // 4. Sync Resting Heart Rate (BPM)
+    if (measurement.heartRateBpm !== undefined && measurement.heartRateBpm > 0) {
+      await Health.saveSample({
+        dataType: 'heartRate',
+        value: measurement.heartRateBpm,
+        unit: 'bpm',
+        startDate: dateIso,
+        endDate: dateIso,
+        metadata: {
+          kultKonnectId: measurement.id,
+          source: 'Cult Smart Scale Pro BCG',
+        },
       });
     }
 

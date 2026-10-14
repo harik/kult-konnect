@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Bluetooth, CheckCircle2, AlertCircle, RefreshCw, HandMetal, Sparkles } from 'lucide-react';
+import { X, Bluetooth, CheckCircle2, AlertCircle, RefreshCw, HandMetal, Sparkles, HeartPulse } from 'lucide-react';
 import { IScaleBleDriver, MeasurementResult } from '@/core/ble/ScaleBleDriver';
 import { ScaleLiveStatus, UserProfile, ScaleMeasurement } from '@/types';
 import { calculateBIA, calculateAge } from '@/core/bia/biaEngine';
 import { saveScaleMeasurement } from '@/core/storage/db';
 import { syncMeasurementToHealthConnect } from '@/core/health/healthConnectSync';
 import { matchProfileForWeight } from '@/core/storage/profileMatcher';
+import { PostureSchematic } from './PostureSchematic';
+import { SegmentalWidget } from './SegmentalWidget';
 
 interface WeighInModalProps {
   isOpen: boolean;
@@ -79,6 +81,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
             ageYears: calculateAge(activeUser.birthDate),
             gender: activeUser.gender,
             impedanceOhm: result.impedanceOhm,
+            rawImpedances: result.rawImpedances,
           });
           setCalculatedBia(bia);
         }
@@ -96,6 +99,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
         ageYears: calculateAge(activeUser.birthDate),
         gender: activeUser.gender,
         impedanceOhm: finalResult.impedanceOhm,
+        rawImpedances: finalResult.rawImpedances,
       });
       setCalculatedBia(bia);
     }
@@ -115,6 +119,9 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
         timestamp: Date.now(),
         weightKg: finalResult.weightKg,
         impedanceOhm: finalResult.impedanceOhm,
+        rawImpedances: finalResult.rawImpedances,
+        heartRateBpm: finalResult.heartRateBpm,
+        segmental: calculatedBia?.segmental,
         bmi: calculatedBia?.bmi || Number((finalResult.weightKg / Math.pow(activeUser.heightCm / 100, 2)).toFixed(1)),
         bodyFatPercent: calculatedBia?.bodyFatPercent,
         musclePercent: calculatedBia?.musclePercent,
@@ -147,10 +154,10 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center overflow-hidden">
+      <div className="relative w-full max-w-md max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center">
         
         {/* Header */}
-        <div className="w-full flex items-center justify-between mb-4">
+        <div className="w-full flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Bluetooth className="w-5 h-5 text-brand-400 animate-pulse" />
             <span className="font-semibold text-slate-200">Cult Smart Scale Pro</span>
@@ -167,26 +174,35 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
         </div>
 
         {/* Live Weight Display Circle */}
-        <div className="relative my-4 flex flex-col items-center justify-center w-64 h-64 rounded-full border-4 border-slate-800 bg-slate-950/70 shadow-inner">
+        <div className="relative my-3 flex flex-col items-center justify-center w-52 h-52 rounded-full border-4 border-slate-800 bg-slate-950/70 shadow-inner">
           {/* Progress Ring Indicator */}
           <div
             className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-500 transition-all duration-300"
             style={{ transform: `rotate(${(status.progressPercent / 100) * 360}deg)` }}
           />
 
-          <span className="text-6xl font-extrabold tracking-tight text-white font-mono">
+          <span className="text-5xl font-extrabold tracking-tight text-white font-mono">
             {status.weightKg > 0 ? status.weightKg.toFixed(1) : '--.-'}
           </span>
           <span className="text-sm font-medium uppercase tracking-wider text-slate-400 mt-1">kg</span>
 
           {/* Handle Grip Status Indicator */}
-          <div className={`mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide transition-all ${
+          <div className={`mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide transition-all ${
             status.hasHandles ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800/80 text-slate-400'
           }`}>
             <HandMetal className="w-3.5 h-3.5" />
             <span>{status.hasHandles ? 'Handles Detected' : 'Feet Only'}</span>
           </div>
         </div>
+
+        {/* Posture Schematic (Guidance during measurement) */}
+        {!finalResult && (
+          <PostureSchematic
+            state={status.state}
+            hasHandles={status.hasHandles}
+            heartRateBpm={status.heartRateBpm}
+          />
+        )}
 
         {/* State Label */}
         <div className="text-center my-2 min-h-[44px]">
@@ -206,6 +222,11 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
               <Sparkles className="w-4 h-4" /> Measuring full body composition... Hold handles firm!
             </p>
           )}
+          {status.state === 'measuring_heart_rate' && (
+            <p className="text-rose-400 text-sm font-medium animate-pulse flex items-center justify-center gap-1.5">
+              <HeartPulse className="w-4 h-4 animate-bounce" /> Measuring resting pulse... Scale spinning!
+            </p>
+          )}
           {status.state === 'completed' && (
             <p className="text-emerald-400 text-sm font-semibold flex items-center justify-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" /> Weigh-in complete!
@@ -217,6 +238,26 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
             </p>
           )}
         </div>
+
+        {/* Resting Heart Rate Card (if captured) */}
+        {finalResult && finalResult.heartRateBpm && (
+          <div className="w-full bg-rose-950/20 border border-rose-500/20 rounded-2xl p-3 my-2 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl">
+                <HeartPulse className="w-4 h-4 animate-pulse" />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-medium block">Resting Heart Rate</span>
+                <span className="text-lg font-bold text-white font-mono">
+                  {finalResult.heartRateBpm} <span className="text-xs text-slate-400 font-normal">BPM</span>
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full font-semibold border border-rose-500/20">
+              BCG Pulse
+            </span>
+          </div>
+        )}
 
         {/* Body Comp Metrics Preview after completion */}
         {calculatedBia && (
@@ -245,6 +286,13 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
               <span className="text-slate-400 block text-[10px]">Visceral Fat</span>
               <span className="text-base font-bold text-rose-400">{calculatedBia.visceralFat}</span>
             </div>
+          </div>
+        )}
+
+        {/* Segmental Breakdown Preview */}
+        {calculatedBia?.segmental && (
+          <div className="w-full">
+            <SegmentalWidget segmental={calculatedBia.segmental} />
           </div>
         )}
 

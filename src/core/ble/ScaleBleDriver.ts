@@ -9,6 +9,8 @@ export const CULT_SCALE_WRITE_UUID = '0000fff1-0000-1000-8000-00805f9b34fb';
 export interface MeasurementResult {
   weightKg: number;
   impedanceOhm?: number;
+  rawImpedances?: number[];
+  heartRateBpm?: number;
   hasBodyComp: boolean;
 }
 
@@ -32,7 +34,10 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
 
   private pendingWeight = 0;
   private pendingImpedance: number | undefined = undefined;
+  private pendingRawImpedances: number[] = [];
+  private pendingHeartRate: number | undefined = undefined;
   private bodyCompPacketCount = 0;
+  private heartRateTimeout: any = null;
 
   async startWeighIn(onStatus: StatusCallback, onResult: ResultCallback): Promise<void> {
     this.onStatus = onStatus;
@@ -40,14 +45,23 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     this.isRunning = true;
     this.pendingWeight = 0;
     this.pendingImpedance = undefined;
+    this.pendingRawImpedances = [];
+    this.pendingHeartRate = undefined;
     this.bodyCompPacketCount = 0;
+    this.clearHeartRateTimer();
 
     try {
-      this.notifyState('scanning', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 10 });
+      this.notifyState('scanning', {
+        weightKg: 0,
+        isStable: false,
+        hasHandles: false,
+        impedanceReceived: false,
+        progressPercent: 10,
+        stepMessage: 'Searching for scale... Step on it to turn on display',
+      });
       
       await BleClient.initialize();
 
-      // Ensure Bluetooth is turned on
       const isBtEnabled = await BleClient.isEnabled();
       if (!isBtEnabled) {
         try {
@@ -88,7 +102,6 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         console.warn('[BLE Driver] requestLEScan not supported or failed, using requestDevice fallback:', scanErr);
       }
 
-      // 2. If auto-scan did not lock onto the scale, trigger native device picker dialog
       if (!deviceId) {
         const device = await BleClient.requestDevice({
           services: [CULT_SCALE_SERVICE_UUID],
@@ -98,14 +111,28 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
       }
 
       this.activeDeviceId = deviceId;
-      this.notifyState('connecting', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 30 });
+      this.notifyState('connecting', {
+        weightKg: 0,
+        isStable: false,
+        hasHandles: false,
+        impedanceReceived: false,
+        progressPercent: 25,
+        stepMessage: 'Connecting to scale...',
+      });
 
       await BleClient.connect(deviceId, (disconnectedDeviceId) => {
         console.log(`[BLE Driver] Device ${disconnectedDeviceId} disconnected`);
         this.handleDisconnectFallback();
       });
 
-      this.notifyState('connected', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 40 });
+      this.notifyState('connected', {
+        weightKg: 0,
+        isStable: false,
+        hasHandles: false,
+        impedanceReceived: false,
+        progressPercent: 35,
+        stepMessage: 'Scale connected. Step on with bare feet and hold the handle',
+      });
 
       // Start notifications on 0xFFF4
       await BleClient.startNotifications(
@@ -118,7 +145,14 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         }
       );
 
-      this.notifyState('measuring_weight', { weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 50 });
+      this.notifyState('measuring_weight', {
+        weightKg: 0,
+        isStable: false,
+        hasHandles: false,
+        impedanceReceived: false,
+        progressPercent: 40,
+        stepMessage: 'Stabilizing weight...',
+      });
     } catch (err: any) {
       console.error('[BLE Driver] Error during weigh-in:', err);
       this.notifyState('error', { 
@@ -139,6 +173,9 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
 
     if (packet.type === 'live_weight') {
       this.pendingWeight = packet.weightKg;
+      if (packet.heartRateBpm) {
+        this.pendingHeartRate = packet.heartRateBpm;
+      }
 
       if (packet.status === 'unstable') {
         this.notifyState('measuring_weight', {
@@ -146,16 +183,17 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
           isStable: false,
           hasHandles: packet.hasHandles,
           impedanceReceived: false,
-          progressPercent: 50,
+          progressPercent: 45,
+          stepMessage: 'Measuring weight... Stand still',
         });
       } else if (packet.status === 'stable_weight_only') {
-        // User stepped on without gripping handles
         this.notifyState('completed', {
           weightKg: packet.weightKg,
           isStable: true,
           hasHandles: false,
           impedanceReceived: false,
           progressPercent: 100,
+          stepMessage: 'Weight locked (feet only)',
         });
         if (this.onResult && this.pendingWeight > 0) {
           this.onResult({ weightKg: this.pendingWeight, hasBodyComp: false });
@@ -166,51 +204,98 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
           isStable: true,
           hasHandles: true,
           impedanceReceived: false,
-          progressPercent: 70,
+          progressPercent: 65,
+          stepMessage: 'Measuring 8-electrode limb & torso bioimpedance...',
+        });
+      } else if (packet.status === 'measuring_heart_rate') {
+        this.notifyState('measuring_heart_rate', {
+          weightKg: packet.weightKg,
+          isStable: true,
+          hasHandles: true,
+          impedanceReceived: true,
+          heartRateBpm: this.pendingHeartRate,
+          progressPercent: 85,
+          stepMessage: 'Measuring resting pulse... Scale is spinning',
         });
       } else if (packet.status === 'stable_complete') {
         this.notifyState('measuring_impedance', {
           weightKg: packet.weightKg,
           isStable: true,
           hasHandles: true,
-          impedanceReceived: false,
-          progressPercent: 85,
+          impedanceReceived: true,
+          progressPercent: 75,
+          stepMessage: 'Full body impedance locked',
         });
       }
     } else if (packet.type === 'impedance') {
+      this.pendingRawImpedances = [...this.pendingRawImpedances, ...packet.impedances];
       if (packet.packetIndex === 0 && packet.wholeBodyImpedance) {
         this.pendingImpedance = packet.wholeBodyImpedance;
-        console.log(`[BLE Driver] Whole body impedance locked: ${this.pendingImpedance}Ω`);
       }
     } else if (packet.type === 'completion') {
       this.bodyCompPacketCount++;
-      if (this.bodyCompPacketCount >= 4 && this.pendingWeight > 0) {
-        this.notifyState('completed', {
+      // When body comp is done, the scale screen begins spinning to measure heart rate!
+      // Do NOT disconnect! Give it 7 seconds to measure pulse / BCG.
+      if (this.bodyCompPacketCount >= 4 && !this.heartRateTimeout) {
+        this.notifyState('measuring_heart_rate', {
           weightKg: this.pendingWeight,
           isStable: true,
           hasHandles: true,
-          impedanceReceived: !!this.pendingImpedance,
-          progressPercent: 100,
+          impedanceReceived: true,
+          heartRateBpm: this.pendingHeartRate,
+          progressPercent: 88,
+          stepMessage: 'Measuring resting pulse rate... Hold still',
         });
-        if (this.onResult) {
-          this.onResult({
-            weightKg: this.pendingWeight,
-            impedanceOhm: this.pendingImpedance,
-            hasBodyComp: !!this.pendingImpedance && this.pendingImpedance > 0,
-          });
-        }
-        this.stopWeighIn();
+
+        this.heartRateTimeout = setTimeout(() => {
+          this.finalizeMeasurement();
+        }, 6500);
       }
+    } else if (packet.type === 'heart_rate') {
+      console.log(`[BLE Driver] Pulse captured: ${packet.bpm} BPM`);
+      this.pendingHeartRate = packet.bpm;
+      this.finalizeMeasurement();
     }
   }
 
+  private finalizeMeasurement() {
+    this.clearHeartRateTimer();
+    if (!this.isRunning || this.pendingWeight <= 0) return;
+
+    this.notifyState('completed', {
+      weightKg: this.pendingWeight,
+      isStable: true,
+      hasHandles: true,
+      impedanceReceived: !!this.pendingImpedance,
+      heartRateBpm: this.pendingHeartRate,
+      progressPercent: 100,
+      stepMessage: 'Weigh-in complete!',
+    });
+
+    if (this.onResult) {
+      this.onResult({
+        weightKg: this.pendingWeight,
+        impedanceOhm: this.pendingImpedance,
+        rawImpedances: this.pendingRawImpedances,
+        heartRateBpm: this.pendingHeartRate,
+        hasBodyComp: !!this.pendingImpedance && this.pendingImpedance > 0,
+      });
+    }
+
+    this.stopWeighIn();
+  }
+
   private handleDisconnectFallback() {
+    this.clearHeartRateTimer();
     if (this.pendingWeight > 0 && this.bodyCompPacketCount < 4) {
       console.warn('[BLE Driver] Disconnected mid-measurement, publishing fallback weight-only');
       if (this.onResult) {
         this.onResult({ weightKg: this.pendingWeight, hasBodyComp: false });
       }
+    } else if (this.pendingWeight > 0) {
+      this.finalizeMeasurement();
     }
+
     this.notifyState('disconnected', {
       weightKg: this.pendingWeight,
       isStable: false,
@@ -226,8 +311,16 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
     }
   }
 
+  private clearHeartRateTimer() {
+    if (this.heartRateTimeout) {
+      clearTimeout(this.heartRateTimeout);
+      this.heartRateTimeout = null;
+    }
+  }
+
   async stopWeighIn(): Promise<void> {
     this.isRunning = false;
+    this.clearHeartRateTimer();
     if (this.activeDeviceId) {
       try {
         await BleClient.stopNotifications(this.activeDeviceId, CULT_SCALE_SERVICE_UUID, CULT_SCALE_NOTIFY_UUID);
@@ -265,18 +358,34 @@ export class MockScaleBleDriver implements IScaleBleDriver {
     this.clearTimer();
 
     // 1. Scanning
-    onStatus({ state: 'scanning', weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 15 });
+    onStatus({
+      state: 'scanning',
+      weightKg: 0,
+      isStable: false,
+      hasHandles: false,
+      impedanceReceived: false,
+      progressPercent: 15,
+      stepMessage: 'Scanning for scale... Step on scale to turn on',
+    });
 
     await this.delay(1000);
     if (!this.isRunning) return;
 
     // 2. Connected
-    onStatus({ state: 'connected', weightKg: 0, isStable: false, hasHandles: false, impedanceReceived: false, progressPercent: 35 });
+    onStatus({
+      state: 'connected',
+      weightKg: 0,
+      isStable: false,
+      hasHandles: false,
+      impedanceReceived: false,
+      progressPercent: 30,
+      stepMessage: 'Connected! Grip the handlebar and stand upright',
+    });
 
     await this.delay(800);
     if (!this.isRunning) return;
 
-    // 3. Live Weight Streaming Simulation (Fluctuating)
+    // 3. Live Weight Streaming Simulation
     const simulatedTarget = 74.5;
     const steps = [42.1, 65.3, 72.8, 74.2, 74.5, 74.5];
 
@@ -288,7 +397,8 @@ export class MockScaleBleDriver implements IScaleBleDriver {
         isStable: i >= 4,
         hasHandles: this.mode === 'full_body',
         impedanceReceived: false,
-        progressPercent: 40 + i * 5,
+        progressPercent: 35 + i * 5,
+        stepMessage: 'Stabilizing weight on load cells...',
       });
       await this.delay(400);
     }
@@ -301,6 +411,7 @@ export class MockScaleBleDriver implements IScaleBleDriver {
         hasHandles: false,
         impedanceReceived: false,
         progressPercent: 100,
+        stepMessage: 'Weight-only complete',
       });
       onResult({ weightKg: simulatedTarget, hasBodyComp: false });
       this.isRunning = false;
@@ -314,37 +425,45 @@ export class MockScaleBleDriver implements IScaleBleDriver {
       isStable: true,
       hasHandles: true,
       impedanceReceived: false,
-      progressPercent: 75,
+      progressPercent: 70,
+      stepMessage: 'Scanning limbs & torso (8 electrodes)... Keep arms forward',
     });
 
-    await this.delay(1200);
+    await this.delay(1400);
     if (!this.isRunning) return;
 
+    // 5. Heart Rate Measurement Simulation (Scale spinning)
     onStatus({
-      state: 'measuring_impedance',
+      state: 'measuring_heart_rate',
       weightKg: simulatedTarget,
       isStable: true,
       hasHandles: true,
       impedanceReceived: true,
-      progressPercent: 90,
+      heartRateBpm: 72,
+      progressPercent: 88,
+      stepMessage: 'Measuring resting heart rate... Scale spinning',
     });
 
-    await this.delay(800);
+    await this.delay(1500);
     if (!this.isRunning) return;
 
-    // 5. Complete
+    // 6. Complete
     onStatus({
       state: 'completed',
       weightKg: simulatedTarget,
       isStable: true,
       hasHandles: true,
       impedanceReceived: true,
+      heartRateBpm: 72,
       progressPercent: 100,
+      stepMessage: 'Full body analysis complete!',
     });
 
     onResult({
       weightKg: simulatedTarget,
       impedanceOhm: 248.5,
+      rawImpedances: [2867, 3013, 248, 2904, 2668, 2750, 2900, 31, 2800, 2550],
+      heartRateBpm: 72,
       hasBodyComp: true,
     });
 

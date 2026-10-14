@@ -98,4 +98,27 @@ describe('Cult Smart Scale Pro BLE Packet Parser', () => {
       expect(packet.sequenceB).toBe(2);
     }
   });
+
+  it('parses dedicated pulse/heart rate packet (0xCE)', () => {
+    const bytes = new Uint8Array([0xCE, 0x00, 0x48, 0x00]); // 0x48 = 72 BPM
+    const packet = parseScalePacket(bytes);
+    expect(packet?.type).toBe('heart_rate');
+    if (packet && packet.type === 'heart_rate') {
+      expect(packet.bpm).toBe(72);
+    }
+  });
+
+  it('parses measuring_heart_rate status in 0xCF packet', () => {
+    const bytes = new Uint8Array([
+      0xCF, 0x80, 0x00, 0xE8, 0x1C, 0x4A, 0x00, 0x00, 0x00, 0x06, 0x00,
+    ]); // byte 5 = 0x4A (74 bpm), status 0x06
+    bytes[10] = calculateXorChecksum(bytes, 10);
+
+    const packet = parseScalePacket(bytes);
+    expect(packet?.type).toBe('live_weight');
+    if (packet && packet.type === 'live_weight') {
+      expect(packet.status).toBe('measuring_heart_rate');
+      expect(packet.heartRateBpm).toBe(74);
+    }
+  });
 });

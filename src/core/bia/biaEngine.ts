@@ -1,4 +1,4 @@
-import { Gender } from '@/types';
+import { Gender, SegmentalBreakdown } from '@/types';
 
 export interface BIAInput {
   weightKg: number;
@@ -6,6 +6,7 @@ export interface BIAInput {
   ageYears: number;
   gender: Gender;
   impedanceOhm: number;
+  rawImpedances?: number[]; // [RA, LA, Whole, RL, LL, ...]
 }
 
 export interface BIAResult {
@@ -17,6 +18,7 @@ export interface BIAResult {
   boneMassKg: number;
   bmrKcal: number;
   visceralFat: number;
+  segmental?: SegmentalBreakdown;
 }
 
 /**
@@ -111,6 +113,8 @@ export function calculateBIA(input: BIAInput): BIAResult {
   let visceralFat = Math.round(bmi * 0.4 + bodyFatPercent * 0.2 + ageYears * 0.05 - (isMale ? 0 : 2));
   visceralFat = Math.max(1, Math.min(30, visceralFat));
 
+  const segmental = calculateSegmentalBIA(weightKg, ffm, input.rawImpedances);
+
   return {
     bmi,
     fatFreeMassKg: Number(ffm.toFixed(1)),
@@ -120,6 +124,80 @@ export function calculateBIA(input: BIAInput): BIAResult {
     boneMassKg: Number(boneMassKg.toFixed(1)),
     bmrKcal,
     visceralFat,
+    segmental,
+  };
+}
+
+/**
+ * Calculates segmental fat and muscle breakdown across 5 anatomical cylinders:
+ * Right Arm, Left Arm, Torso, Right Leg, Left Leg.
+ */
+export function calculateSegmentalBIA(
+  totalWeightKg: number,
+  totalFfmKg: number,
+  rawImpedances?: number[]
+): SegmentalBreakdown {
+  const totalFatKg = Math.max(0.5, totalWeightKg - totalFfmKg);
+
+  // Normalized impedances (Ohms). Scale transmits in 0.1 Ohm for segmental (e.g. 2867 -> 286.7 Ohm)
+  let impRA = 286.7;
+  let impLA = 301.3;
+  let impRL = 290.4;
+  let impLL = 266.8;
+
+  if (rawImpedances && rawImpedances.length >= 5) {
+    impRA = rawImpedances[0] > 1000 ? rawImpedances[0] / 10.0 : rawImpedances[0];
+    impLA = rawImpedances[1] > 1000 ? rawImpedances[1] / 10.0 : rawImpedances[1];
+    impRL = rawImpedances[3] > 1000 ? rawImpedances[3] / 10.0 : rawImpedances[3];
+    impLL = rawImpedances[4] > 1000 ? rawImpedances[4] / 10.0 : rawImpedances[4];
+  }
+
+  // Conductance (1 / R) of each limb: higher conductance = higher muscle mass
+  const condRA = 1 / Math.max(100, impRA);
+  const condLA = 1 / Math.max(100, impLA);
+  const condRL = 1 / Math.max(100, impRL);
+  const condLL = 1 / Math.max(100, impLL);
+
+  // Anthropometric lean mass (FFM) distribution:
+  // Arms ~8% (4% each), Legs ~34% (17% each), Torso ~58%
+  const ffmArmsTotal = totalFfmKg * 0.08;
+  const ffmLegsTotal = totalFfmKg * 0.34;
+  const ffmTorso = totalFfmKg * 0.58;
+
+  const ffmRA = ffmArmsTotal * (condRA / (condRA + condLA));
+  const ffmLA = ffmArmsTotal * (condLA / (condRA + condLA));
+  const ffmRL = ffmLegsTotal * (condRL / (condRL + condLL));
+  const ffmLL = ffmLegsTotal * (condLL / (condRL + condLL));
+
+  // Anthropometric fat mass distribution:
+  // Arms ~10%, Legs ~35%, Torso ~55%
+  // Higher limb impedance relative to counterpart correlates with higher fat share
+  const fatArmsTotal = totalFatKg * 0.10;
+  const fatLegsTotal = totalFatKg * 0.35;
+  const fatTorso = totalFatKg * 0.55;
+
+  const fatRA = fatArmsTotal * (impRA / (impRA + impLA));
+  const fatLA = fatArmsTotal * (impLA / (impRA + impLA));
+  const fatRL = fatLegsTotal * (impRL / (impRL + impLL));
+  const fatLL = fatLegsTotal * (impLL / (impRL + impLL));
+
+  const buildSegment = (fatKg: number, segFfm: number) => {
+    const segWeight = fatKg + segFfm;
+    const fatPercent = Math.min(60.0, Math.max(5.0, (fatKg / segWeight) * 100));
+    const muscleKg = segFfm * 0.55; // Skeletal muscle ratio of FFM
+    return {
+      fatPercent: Number(fatPercent.toFixed(1)),
+      fatKg: Number(fatKg.toFixed(1)),
+      muscleKg: Number(muscleKg.toFixed(1)),
+    };
+  };
+
+  return {
+    rightArm: buildSegment(fatRA, ffmRA),
+    leftArm: buildSegment(fatLA, ffmLA),
+    torso: buildSegment(fatTorso, ffmTorso),
+    rightLeg: buildSegment(fatRL, ffmRL),
+    leftLeg: buildSegment(fatLL, ffmLL),
   };
 }
 

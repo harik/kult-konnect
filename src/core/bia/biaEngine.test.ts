@@ -73,4 +73,29 @@ describe('BIA Calculation Engine', () => {
     expect(getBMICategory(26.5).label).toBe('Overweight');
     expect(getBMICategory(32.0).label).toBe('Obese');
   });
+
+  it('calculates segmental BIA for all 5 anatomical zones', () => {
+    const rawImps = [2867, 3013, 248, 2904, 2668, 2750, 2900, 31, 2800, 2550];
+    const result = calculateBIA({
+      weightKg: 78,
+      heightCm: 180,
+      ageYears: 30,
+      gender: 'male',
+      impedanceOhm: 248,
+      rawImpedances: rawImps,
+    });
+
+    expect(result.segmental).toBeDefined();
+    const seg = result.segmental!;
+    expect(seg.rightArm.fatPercent).toBeGreaterThan(5);
+    expect(seg.rightArm.muscleKg).toBeGreaterThan(1);
+    expect(seg.leftArm.fatPercent).toBeGreaterThan(5);
+    expect(seg.leftArm.muscleKg).toBeGreaterThan(1);
+    expect(seg.torso.fatPercent).toBeGreaterThan(5);
+    expect(seg.torso.muscleKg).toBeGreaterThan(10);
+    expect(seg.rightLeg.fatPercent).toBeGreaterThan(5);
+    expect(seg.rightLeg.muscleKg).toBeGreaterThan(4);
+    expect(seg.leftLeg.fatPercent).toBeGreaterThan(5);
+    expect(seg.leftLeg.muscleKg).toBeGreaterThan(4);
+  });
 });

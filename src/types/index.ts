@@ -12,12 +12,29 @@ export interface UserProfile {
   updatedAt: number;
 }
 
+export interface SegmentMetrics {
+  fatPercent: number;
+  fatKg: number;
+  muscleKg: number;
+}
+
+export interface SegmentalBreakdown {
+  rightArm: SegmentMetrics;
+  leftArm: SegmentMetrics;
+  torso: SegmentMetrics;
+  rightLeg: SegmentMetrics;
+  leftLeg: SegmentMetrics;
+}
+
 export interface ScaleMeasurement {
   id: string;
   profileId: string;
   timestamp: number; // Unix ms
   weightKg: number;
   impedanceOhm?: number;
+  rawImpedances?: number[]; // all 10 raw frequencies/segments
+  heartRateBpm?: number;
+  segmental?: SegmentalBreakdown;
   bmi: number;
   bodyFatPercent?: number;
   musclePercent?: number;
@@ -32,6 +49,7 @@ export interface ScaleMeasurement {
     boneMass?: string;
     bmr?: string;
     leanBodyMass?: string;
+    heartRate?: string;
   };
   createdAt: number;
 }
@@ -43,6 +61,7 @@ export type ScaleConnectionState =
   | 'connected'
   | 'measuring_weight'
   | 'measuring_impedance'
+  | 'measuring_heart_rate'
   | 'completed'
   | 'error';
 
@@ -52,7 +71,9 @@ export interface ScaleLiveStatus {
   isStable: boolean;
   hasHandles: boolean;
   impedanceReceived: boolean;
+  heartRateBpm?: number;
   progressPercent: number;
+  stepMessage?: string;
   errorMessage?: string;
 }
 
