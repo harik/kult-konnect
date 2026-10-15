@@ -47,10 +47,15 @@ async function createOtaBundle() {
     archive.finalize();
   });
 
+  // Auto-detect production URL from Vercel system environment variables if available
+  const vercelDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  const baseUrl = process.env.VITE_PUBLIC_URL || (vercelDomain ? `https://${vercelDomain}` : '');
+  const bundleUrl = baseUrl ? `${baseUrl}/updates/bundle.zip` : '/updates/bundle.zip';
+
   // Create version.json
   const versionInfo = {
     version: version,
-    url: '/updates/bundle.zip',
+    url: bundleUrl,
     releaseDate: new Date().toISOString(),
   };
 

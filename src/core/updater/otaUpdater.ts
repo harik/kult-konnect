@@ -20,7 +20,9 @@ export interface UpdateStatus {
  * Default update manifest endpoint.
  * In production, this points to your Vercel deployment URL (e.g. https://kult-konnect.vercel.app/updates/version.json).
  */
-const DEFAULT_UPDATE_URL = import.meta.env.VITE_UPDATE_URL || '/updates/version.json';
+const DEFAULT_UPDATE_URL =
+  import.meta.env.VITE_UPDATE_URL ||
+  (import.meta.env.VITE_PUBLIC_URL ? `${import.meta.env.VITE_PUBLIC_URL}/updates/version.json` : '/updates/version.json');
 
 /**
  * Initializes the OTA updater.
@@ -101,9 +103,13 @@ export async function downloadAndStageOtaUpdate(info: VersionInfo): Promise<bool
   if (!Capacitor.isNativePlatform()) return false;
 
   try {
-    console.log(`[OTA] Downloading update bundle: ${info.version} from ${info.url}`);
+    const resolvedUrl = info.url.startsWith('http')
+      ? info.url
+      : new URL(info.url, DEFAULT_UPDATE_URL.startsWith('http') ? DEFAULT_UPDATE_URL : window.location.origin).toString();
+
+    console.log(`[OTA] Downloading update bundle: ${info.version} from ${resolvedUrl}`);
     const bundle = await CapacitorUpdater.download({
-      url: info.url,
+      url: resolvedUrl,
       version: info.version,
     });
 
