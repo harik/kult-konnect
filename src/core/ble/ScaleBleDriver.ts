@@ -1,4 +1,4 @@
-import { BleClient } from '@capacitor-community/bluetooth-le';
+import { BleClient, BluetoothLe } from '@capacitor-community/bluetooth-le';
 import { parseScalePacket } from './packetParser';
 import { ScaleLiveStatus, ScaleConnectionState } from '@/types';
 
@@ -21,6 +21,7 @@ export interface IScaleBleDriver {
   startWeighIn(onStatus: StatusCallback, onResult: ResultCallback): Promise<void>;
   stopWeighIn(): Promise<void>;
   isScanningOrConnected(): boolean;
+  requestPermissions?(): Promise<boolean>;
 }
 
 /**
@@ -38,6 +39,20 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
   private pendingHeartRate: number | undefined = undefined;
   private bodyCompPacketCount = 0;
   private heartRateTimeout: any = null;
+
+  async requestPermissions(): Promise<boolean> {
+    try {
+      const plugin = BluetoothLe as any;
+      if (plugin && typeof plugin.requestPermissions === 'function') {
+        await plugin.requestPermissions();
+      }
+      await BleClient.initialize();
+      return true;
+    } catch (e) {
+      console.warn('[BLE Driver] requestPermissions error:', e);
+      return false;
+    }
+  }
 
   async startWeighIn(onStatus: StatusCallback, onResult: ResultCallback): Promise<void> {
     this.onStatus = onStatus;
@@ -60,16 +75,46 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         stepMessage: 'Searching for scale... Step on it to turn on display',
       });
       
-      await BleClient.initialize();
-
-      const isBtEnabled = await BleClient.isEnabled();
-      if (!isBtEnabled) {
-        try {
-          await BleClient.requestEnable();
-        } catch (e) {
-          console.warn('[BLE Driver] Bluetooth enable request rejected or dismissed');
+      // Proactively initialize BLE and prompt user if permissions are missing
+      try {
+        await BleClient.initialize();
+      } catch (initErr: any) {
+        console.warn('[BLE Driver] BleClient.initialize failed on first pass. Proactively prompting user for permissions:', initErr);
+        const plugin = BluetoothLe as any;
+        if (plugin && typeof plugin.requestPermissions === 'function') {
+          try {
+            await plugin.requestPermissions();
+          } catch (permErr) {
+            console.warn('[BLE Driver] plugin.requestPermissions failed:', permErr);
+          }
         }
+        await BleClient.initialize();
       }
+
+      // Check and request Bluetooth enabled
+      try {
+        const isBtEnabled = await BleClient.isEnabled();
+        if (!isBtEnabled) {
+          try {
+            await BleClient.requestEnable();
+          } catch (e) {
+            console.warn('[BLE Driver] Bluetooth enable request rejected or dismissed');
+          }
+        }
+      } catch (e) {
+        console.warn('[BLE Driver] Bluetooth status check error:', e);
+      }
+
+      // On Android, check if Location Services are enabled
+      try {
+        const isLocEnabled = await BleClient.isLocationEnabled();
+        if (!isLocEnabled) {
+          console.warn('[BLE Driver] Location Services are OFF on device. Opening settings dialog.');
+          try {
+            await BleClient.openLocationSettings();
+          } catch {}
+        }
+      } catch {}
 
       let deviceId: string | null = null;
 
@@ -90,7 +135,8 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
                 clearTimeout(timeout);
                 deviceId = scanResult.device.deviceId;
                 try { await BleClient.stopLEScan(); } catch {}
-                resolve();
+                // Give Android Bluetooth controller 400ms to cleanly tear down LE scan
+                setTimeout(resolve, 400);
               }
             });
           } catch (scanErr) {
@@ -111,19 +157,55 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
       }
 
       this.activeDeviceId = deviceId;
-      this.notifyState('connecting', {
-        weightKg: 0,
-        isStable: false,
-        hasHandles: false,
-        impedanceReceived: false,
-        progressPercent: 25,
-        stepMessage: 'Connecting to scale...',
-      });
 
-      await BleClient.connect(deviceId, (disconnectedDeviceId) => {
-        console.log(`[BLE Driver] Device ${disconnectedDeviceId} disconnected`);
-        this.handleDisconnectFallback();
-      });
+      // Clear any hanging GATT instance on this device before opening a new connection
+      try {
+        await BleClient.disconnect(deviceId);
+        await new Promise((r) => setTimeout(r, 250));
+      } catch {}
+
+      // Connect to GATT with automatic retry logic for Android status 133/147 recovery
+      const maxConnectAttempts = 3;
+      let isConnected = false;
+      let lastConnectError: any = null;
+
+      for (let attempt = 1; attempt <= maxConnectAttempts; attempt++) {
+        try {
+          this.notifyState('connecting', {
+            weightKg: 0,
+            isStable: false,
+            hasHandles: false,
+            impedanceReceived: false,
+            progressPercent: 20 + attempt * 5,
+            stepMessage: attempt === 1
+              ? 'Connecting to scale...'
+              : `Scale busy. Retrying connection (${attempt}/${maxConnectAttempts})... Keep display awake!`,
+          });
+
+          await BleClient.connect(deviceId, (disconnectedDeviceId) => {
+            console.log(`[BLE Driver] Device ${disconnectedDeviceId} disconnected`);
+            this.handleDisconnectFallback();
+          }, { timeout: 8000 });
+
+          isConnected = true;
+          break;
+        } catch (err: any) {
+          lastConnectError = err;
+          console.warn(`[BLE Driver] Connect attempt ${attempt}/${maxConnectAttempts} failed:`, err);
+          try {
+            await BleClient.disconnect(deviceId);
+          } catch {}
+
+          if (attempt < maxConnectAttempts) {
+            // Android Bluetooth stack needs 800ms cooldown to release GATT table locks
+            await new Promise((r) => setTimeout(r, 800));
+          }
+        }
+      }
+
+      if (!isConnected) {
+        throw lastConnectError;
+      }
 
       this.notifyState('connected', {
         weightKg: 0,
@@ -133,6 +215,9 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
         progressPercent: 35,
         stepMessage: 'Scale connected. Step on with bare feet and hold the handle',
       });
+
+      // Allow GATT discovery to settle before subscribing to notifications
+      await new Promise((r) => setTimeout(r, 300));
 
       // Start notifications on 0xFFF4
       await BleClient.startNotifications(
@@ -155,13 +240,20 @@ export class CapacitorScaleBleDriver implements IScaleBleDriver {
       });
     } catch (err: any) {
       console.error('[BLE Driver] Error during weigh-in:', err);
+      let errorMessage = err?.message || 'Bluetooth connection failed';
+      const lower = errorMessage.toLowerCase();
+      if (lower.includes('location') || lower.includes('permission') || lower.includes('access_fine_location')) {
+        errorMessage = 'Missing required permissions (Nearby Devices / Location). Please tap "Grant Permissions" below or enable Location in Android Settings.';
+      } else if (errorMessage.includes('147') || errorMessage.includes('133') || lower.includes('connection failed')) {
+        errorMessage = 'Scale connection timed out (Status 147). Make sure: (1) Scale LCD is ON before tapping Weigh In. (2) Cult.fit app is closed on all nearby devices. (3) If paired in Android Bluetooth Settings, unpair it.';
+      }
       this.notifyState('error', { 
         weightKg: 0, 
         isStable: false, 
         hasHandles: false, 
         impedanceReceived: false, 
         progressPercent: 0,
-        errorMessage: err?.message || 'Bluetooth connection failed',
+        errorMessage,
       });
       await this.stopWeighIn();
     }
@@ -489,6 +581,10 @@ export class MockScaleBleDriver implements IScaleBleDriver {
     return this.isRunning;
   }
 
+  async requestPermissions(): Promise<boolean> {
+    return true;
+  }
+
   private clearTimer() {
     if (this.timer) {
       clearTimeout(this.timer);
@@ -502,3 +598,6 @@ export class MockScaleBleDriver implements IScaleBleDriver {
     });
   }
 }
+
+export { WebScaleBleDriver } from './WebScaleBleDriver';
+

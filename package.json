@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "build": "tsc && vite build && node scripts/prepare-ota.mjs",
+    "preview": "vite preview --host",
+    "serve": "vite preview --host",
+    "serve:apk": "node scripts/serve-apk.mjs",
+    "build:apk": "npm run build && npx cap sync android && (cd android && JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew assembleRelease) && cp android/app/build/outputs/apk/release/app-release.apk public/kult-konnect.apk && cp android/app/build/outputs/apk/release/app-release.apk dist/kult-konnect.apk",
     "test": "vitest run",
     "test:watch": "vitest",
     "cap:sync": "npx cap sync android",
@@ -17,6 +20,7 @@
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capgo/capacitor-health": "^8.11.11",
+    "@capgo/capacitor-updater": "^8.53.0",
     "chart.js": "^4.4.6",
     "clsx": "^2.1.1",
     "dexie": "^4.0.10",
@@ -31,10 +35,12 @@
     "@capacitor/cli": "^8.5.3",
     "@testing-library/jest-dom": "^6.6.2",
     "@testing-library/react": "^16.0.1",
+    "@types/archiver": "^8.0.0",
     "@types/node": "^22.8.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "archiver": "^8.0.0",
     "autoprefixer": "^10.4.20",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^25.0.1",
@@ -42,6 +48,7 @@
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^2.1.3"
   }
 }

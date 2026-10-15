@@ -11,6 +11,9 @@ const config: CapacitorConfig = {
     CapacitorHealth: {
       enableLogging: true,
     },
+    CapacitorUpdater: {
+      autoUpdate: false,
+    },
   },
 };
 

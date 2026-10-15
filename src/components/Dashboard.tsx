@@ -155,88 +155,88 @@ export const Dashboard: React.FC<DashboardProps> = ({
           Body Composition
         </h3>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           {/* Body Fat */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Body Fat</span>
-              <Activity className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-slate-400 font-medium truncate">Body Fat</span>
+              <Activity className="w-4 h-4 text-amber-400 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.bodyFatPercent !== undefined ? `${latestMeasurement.bodyFatPercent.toFixed(1)}%` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">Total body fat ratio</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">Total body fat ratio</span>
             </div>
           </div>
 
           {/* Muscle Mass */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Skeletal Muscle</span>
-              <Dumbbell className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs text-slate-400 font-medium truncate">Skeletal Muscle</span>
+              <Dumbbell className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.musclePercent !== undefined ? `${latestMeasurement.musclePercent.toFixed(1)}%` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">Muscle mass ratio</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">Muscle mass ratio</span>
             </div>
           </div>
 
           {/* Body Water */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Total Water</span>
-              <Droplets className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs text-slate-400 font-medium truncate">Total Water</span>
+              <Droplets className="w-4 h-4 text-cyan-400 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.waterPercent !== undefined ? `${latestMeasurement.waterPercent.toFixed(1)}%` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">Hydration status</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">Hydration status</span>
             </div>
           </div>
 
           {/* Bone Mass */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Bone Mass</span>
-              <ShieldCheck className="w-4 h-4 text-slate-300" />
+              <span className="text-xs text-slate-400 font-medium truncate">Bone Mass</span>
+              <ShieldCheck className="w-4 h-4 text-slate-300 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.boneMassKg !== undefined ? `${latestMeasurement.boneMassKg.toFixed(1)} kg` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">Bone mineral density</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">Bone mineral density</span>
             </div>
           </div>
 
           {/* BMR */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Basal Metabolic</span>
-              <Flame className="w-4 h-4 text-orange-400" />
+              <span className="text-xs text-slate-400 font-medium truncate">Basal Metabolic</span>
+              <Flame className="w-4 h-4 text-orange-400 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.bmrKcal !== undefined ? `${latestMeasurement.bmrKcal}` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">kcal / day resting</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">kcal / day resting</span>
             </div>
           </div>
 
           {/* Visceral Fat */}
-          <div className="bg-slate-900 border border-slate-800/80 p-4 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800/80 p-3 sm:p-4 rounded-2xl flex flex-col justify-between min-w-0 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 font-medium">Visceral Fat</span>
-              <HeartPulse className="w-4 h-4 text-rose-400" />
+              <span className="text-xs text-slate-400 font-medium truncate">Visceral Fat</span>
+              <HeartPulse className="w-4 h-4 text-rose-400 shrink-0" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">
+              <span className="text-lg sm:text-2xl font-bold text-white font-mono tracking-tight tabular-nums block truncate">
                 {latestMeasurement.visceralFat !== undefined ? `${latestMeasurement.visceralFat}` : '--'}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5">Abdominal cavity index</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">Abdominal cavity index</span>
             </div>
           </div>
         </div>

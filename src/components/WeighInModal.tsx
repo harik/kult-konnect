@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Bluetooth, CheckCircle2, AlertCircle, RefreshCw, HandMetal, Sparkles, HeartPulse } from 'lucide-react';
+import { X, Bluetooth, CheckCircle2, AlertCircle, RefreshCw, HandMetal, Sparkles, HeartPulse, Download, HelpCircle, ShieldAlert } from 'lucide-react';
 import { IScaleBleDriver, MeasurementResult } from '@/core/ble/ScaleBleDriver';
 import { ScaleLiveStatus, UserProfile, ScaleMeasurement } from '@/types';
 import { calculateBIA, calculateAge } from '@/core/bia/biaEngine';
@@ -89,6 +89,23 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
     );
   };
 
+  const handleRetry = async () => {
+    try {
+      await driver.stopWeighIn();
+    } catch {}
+    setStatus({
+      state: 'disconnected',
+      weightKg: 0,
+      isStable: false,
+      hasHandles: false,
+      impedanceReceived: false,
+      progressPercent: 0,
+    });
+    setTimeout(() => {
+      startSession();
+    }, 400);
+  };
+
   const handleProfileChange = (newProfileId: string) => {
     setSelectedProfileId(newProfileId);
     if (finalResult && finalResult.hasBodyComp && finalResult.impedanceOhm) {
@@ -153,8 +170,8 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center">
         
         {/* Header */}
         <div className="w-full flex items-center justify-between mb-2">
@@ -168,34 +185,36 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
                 ? 'text-slate-500'
                 : 'text-brand-400'
             }`} />
-            <span className="font-semibold text-slate-200">Cult Smart Scale Pro</span>
+            <span className="font-semibold text-slate-200 text-sm sm:text-base">Cult Smart Scale Pro</span>
           </div>
           <button
             onClick={() => {
               driver.stopWeighIn();
               onClose();
             }}
-            className="p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/60 transition"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/60 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Live Weight Display Circle */}
-        <div className="relative my-3 flex flex-col items-center justify-center w-52 h-52 rounded-full border-4 border-slate-800 bg-slate-950/70 shadow-inner">
+        <div className={`relative my-2 sm:my-3 flex flex-col items-center justify-center rounded-full border-4 border-slate-800 bg-slate-950/70 shadow-inner ${
+          finalResult ? 'w-36 h-36 sm:w-44 sm:h-44' : 'w-44 h-44 sm:w-52 sm:h-52'
+        }`}>
           {/* Progress Ring Indicator */}
           <div
             className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-500 transition-transform duration-150 ease-out"
             style={{ transform: `rotate(${(status.progressPercent / 100) * 360}deg)` }}
           />
 
-          <span className="text-5xl font-extrabold tracking-tight text-white font-mono">
+          <span className={`${finalResult ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'} font-extrabold tracking-tight text-white font-mono`}>
             {finalResult ? finalResult.weightKg.toFixed(1) : status.weightKg > 0 ? status.weightKg.toFixed(1) : '--.-'}
           </span>
-          <span className="text-sm font-medium uppercase tracking-wider text-slate-400 mt-1">kg</span>
+          <span className="text-xs sm:text-sm font-medium uppercase tracking-wider text-slate-400 mt-0.5">kg</span>
 
           {/* Handle Grip Status Indicator */}
-          <div className={`mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide transition-all ${
+          <div className={`mt-1.5 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold tracking-wide transition-all ${
             status.hasHandles ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800/80 text-slate-400'
           }`}>
             <HandMetal className="w-3.5 h-3.5" />
@@ -246,9 +265,91 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
             </p>
           )}
           {status.state === 'error' && (
-            <p className="text-red-400 text-sm flex items-center justify-center gap-1.5">
-              <AlertCircle className="w-4 h-4" /> {status.errorMessage || 'Bluetooth connection failed'}
-            </p>
+            <div className="space-y-3">
+              <p className="text-red-400 text-xs flex items-center justify-center gap-1.5 px-2 text-center">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{status.errorMessage || 'Bluetooth connection failed'}</span>
+              </p>
+
+              {/* Try Again Button */}
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-md transition active:scale-95"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Wake Scale & Try Again
+                </button>
+              </div>
+
+              {/* Missing Permission Action Card */}
+              {(status.errorMessage?.toLowerCase().includes('permission') || status.errorMessage?.toLowerCase().includes('location')) && (
+                <div className="bg-slate-950/90 border border-amber-500/40 rounded-2xl p-3 text-xs text-slate-300 space-y-2 text-left">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>Permission Required for Scale Discovery</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Android requires both Nearby Devices and Location permissions to discover and connect to Bluetooth LE hardware.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (driver.requestPermissions) {
+                        await driver.requestPermissions();
+                      }
+                      handleRetry();
+                    }}
+                    className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-md transition active:scale-95"
+                  >
+                    <ShieldAlert className="w-4 h-4" /> Grant Missing Permissions & Try Again
+                  </button>
+                </div>
+              )}
+
+              {/* Web Bluetooth fallback banner */}
+              {status.errorMessage?.includes('not available in this browser') && (
+                <div className="bg-slate-950/90 border border-brand-500/30 rounded-2xl p-3 text-xs text-slate-300 space-y-2">
+                  <p className="font-semibold text-brand-300">
+                    Web Bluetooth is not supported in this browser.
+                  </p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Install the native Android APK for direct Bluetooth LE hardware streaming & Google Health Connect sync.
+                  </p>
+                  <a
+                    href="/kult-konnect.apk"
+                    download="kult-konnect.apk"
+                    className="inline-flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs shadow-md transition"
+                  >
+                    <Download className="w-4 h-4" /> Download Native Android APK
+                  </a>
+                </div>
+              )}
+
+              {/* Status 147 / Connection Error Checklist */}
+              {(status.errorMessage?.includes('147') || status.errorMessage?.includes('timed out') || status.errorMessage?.includes('failed')) && (
+                <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 text-[11px] text-slate-300 text-left space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs mb-1">
+                    <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>How to fix Connection Status 147:</span>
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1 text-slate-300 leading-normal">
+                    <li>
+                      <strong className="text-white">Wake the scale:</strong> Step firmly on the scale until the LCD displays <code className="text-brand-300 bg-slate-900 px-1 rounded">0.0 kg</code> right before tapping Try Again.
+                    </li>
+                    <li>
+                      <strong className="text-white">Disconnect other apps:</strong> Force-close the official Cult.fit app on all phones (the scale accepts only 1 BLE connection).
+                    </li>
+                    <li>
+                      <strong className="text-white">Unpair from phone settings:</strong> If the scale is paired under Android Settings &gt; Bluetooth, tap <em>Forget / Unpair</em>. BLE scales connect directly in the app.
+                    </li>
+                    <li>
+                      <strong className="text-white">Quick reset:</strong> Toggle Bluetooth off and on in Android Quick Settings.
+                    </li>
+                  </ol>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -278,30 +379,30 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
 
         {/* Body Comp Metrics Preview after completion */}
         {calculatedBia && (
-          <div className="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 my-2 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">Body Fat</span>
-              <span className="text-base font-bold text-amber-400">{calculatedBia.bodyFatPercent}%</span>
+          <div className="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5 my-2 grid grid-cols-3 gap-1.5 text-center">
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">Body Fat</span>
+              <span className="text-xs sm:text-sm font-bold text-amber-400 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.bodyFatPercent}%</span>
             </div>
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">Muscle</span>
-              <span className="text-base font-bold text-emerald-400">{calculatedBia.musclePercent}%</span>
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">Muscle</span>
+              <span className="text-xs sm:text-sm font-bold text-emerald-400 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.musclePercent}%</span>
             </div>
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">Water</span>
-              <span className="text-base font-bold text-cyan-400">{calculatedBia.waterPercent}%</span>
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">Water</span>
+              <span className="text-xs sm:text-sm font-bold text-cyan-400 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.waterPercent}%</span>
             </div>
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">Bone Mass</span>
-              <span className="text-base font-bold text-slate-200">{calculatedBia.boneMassKg} kg</span>
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">Bone Mass</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-200 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.boneMassKg} kg</span>
             </div>
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">BMR</span>
-              <span className="text-base font-bold text-violet-400">{calculatedBia.bmrKcal} kcal</span>
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">BMR</span>
+              <span className="text-xs sm:text-sm font-bold text-violet-400 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.bmrKcal} kcal</span>
             </div>
-            <div className="bg-slate-900/80 p-2 rounded-xl">
-              <span className="text-slate-400 block text-[10px]">Visceral Fat</span>
-              <span className="text-base font-bold text-rose-400">{calculatedBia.visceralFat}</span>
+            <div className="bg-slate-900/80 p-1.5 sm:p-2 rounded-xl min-w-0 overflow-hidden">
+              <span className="text-slate-400 block text-[9px] sm:text-[10px] truncate">Visceral Fat</span>
+              <span className="text-xs sm:text-sm font-bold text-rose-400 font-mono tracking-tight tabular-nums block truncate">{calculatedBia.visceralFat}</span>
             </div>
           </div>
         )}
@@ -320,7 +421,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
             <select
               value={selectedProfileId}
               onChange={(e) => handleProfileChange(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -338,15 +439,15 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
               <button
                 disabled={isSaving}
                 onClick={() => handleSave(true)}
-                className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center justify-center gap-2"
+                className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center justify-center gap-2 text-xs sm:text-sm leading-snug"
               >
-                <CheckCircle2 className="w-5 h-5" />
-                {isSaving ? 'Saving...' : 'Save & Sync to Health Connect'}
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span className="text-center">{isSaving ? 'Saving...' : 'Save & Sync to Health Connect'}</span>
               </button>
               <button
                 disabled={isSaving}
                 onClick={() => handleSave(false)}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 px-4 rounded-xl transition text-sm"
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 px-4 rounded-xl transition text-xs sm:text-sm text-center"
               >
                 Save Locally Only
               </button>

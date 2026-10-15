@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, HeartPulse, HardDrive, Download, Upload, FileSpreadsheet, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { X, Settings, HeartPulse, HardDrive, Download, Upload, FileSpreadsheet, RefreshCw, CheckCircle2, ShieldCheck, Smartphone } from 'lucide-react';
 import { checkHealthConnectAvailability, requestHealthPermissions, syncPendingMeasurements, HealthSyncStatus } from '@/core/health/healthConnectSync';
 import { downloadLocalBackupFile, restoreFromFile } from '@/core/drive/driveBackup';
 import { exportToCsv } from '@/core/storage/db';
+import { Capacitor } from '@capacitor/core';
+import { checkForOtaUpdate, downloadAndStageOtaUpdate } from '@/core/updater/otaUpdater';
+import { Sparkles } from 'lucide-react';
+
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,11 +33,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  // OTA Updates State
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       loadHealthStatus();
     }
   }, [isOpen]);
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateMsg(null);
+    try {
+      const res = await checkForOtaUpdate();
+      if (res.hasUpdate && res.latestVersion) {
+        setUpdateMsg(`Found new update (v${res.latestVersion})! Downloading...`);
+        const endpoint = import.meta.env.VITE_UPDATE_URL || '/updates/version.json';
+        const vRes = await fetch(endpoint, { cache: 'no-store' });
+        const info = await vRes.json();
+        const ok = await downloadAndStageOtaUpdate(info);
+        if (ok) {
+          setUpdateMsg(`Update v${res.latestVersion} ready! Restart app to apply.`);
+        } else {
+          setUpdateMsg('Failed to download update bundle.');
+        }
+      } else {
+        setUpdateMsg('App is up to date with latest live version.');
+      }
+    } catch (e: any) {
+      setUpdateMsg(e.message || 'Check failed');
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const loadHealthStatus = async () => {
     const res = await checkHealthConnectAvailability();
@@ -168,26 +202,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </p>
 
           <div className="flex flex-col gap-2">
-            {!healthStatus?.isAuthorized && healthStatus?.isAvailable && (
-              <button
-                onClick={handleGrantPermissions}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
-              >
-                <ShieldCheck className="w-4 h-4 text-brand-400" /> Request Health Connect Permissions
-              </button>
-            )}
+            {!healthStatus?.isAvailable ? (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <span className="text-xs text-amber-300 font-medium block mb-1">
+                  Requires Native Android App
+                </span>
+                <span className="text-[11px] text-slate-400 block mb-2.5">
+                  Web browsers & PWAs cannot access Android OS Health Connect due to Android security sandboxing. To enable Health Connect sync, switch to the native Android APK below.
+                </span>
+                <a
+                  href="/kult-konnect.apk"
+                  download="kult-konnect.apk"
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5 text-brand-400" /> Download Android APK for Health Connect
+                </a>
+              </div>
+            ) : (
+              <>
+                {!healthStatus?.isAuthorized && (
+                  <button
+                    onClick={handleGrantPermissions}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-brand-400" /> Request Health Connect Permissions
+                  </button>
+                )}
 
-            <button
-              disabled={isSyncing}
-              onClick={handleSyncPending}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing...' : 'Sync Pending Measurements'}
-            </button>
+                <button
+                  disabled={isSyncing}
+                  onClick={handleSyncPending}
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync Pending Measurements'}
+                </button>
 
-            {syncMessage && (
-              <span className="text-[11px] text-slate-400 text-center mt-1">{syncMessage}</span>
+                {syncMessage && (
+                  <span className="text-[11px] text-slate-400 text-center mt-1">{syncMessage}</span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -232,8 +286,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
+        {/* Section 4: Software Updates (Native) or Android Companion (Web/PWA) */}
+        {Capacitor.isNativePlatform() ? (
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase font-semibold tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-violet-400" /> Over-The-Air Updates
+              </span>
+              <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+                Live OTA
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              Kult Konnect automatically checks Vercel for live updates on startup. You can also trigger an immediate check.
+            </p>
+            <button
+              disabled={isCheckingUpdate}
+              onClick={handleCheckUpdates}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+              {isCheckingUpdate ? 'Checking Vercel...' : 'Check for Updates Now'}
+            </button>
+            {updateMsg && (
+              <span className="text-[11px] text-brand-400 text-center block mt-2">{updateMsg}</span>
+            )}
+          </div>
+        ) : (
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 mt-4">
+            <span className="text-xs uppercase font-semibold tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+              <Smartphone className="w-4 h-4 text-emerald-400" /> Native Android Companion
+            </span>
+            <p className="text-xs text-slate-400 mb-3">
+              Need direct Google Health Connect synchronization? Install the native Android APK companion app.
+            </p>
+            <a
+              href="/kult-konnect.apk"
+              download="kult-konnect.apk"
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-between shadow-md"
+            >
+              <span className="flex items-center gap-2">
+                <Download className="w-4 h-4" /> Download Native APK
+              </span>
+              <span className="text-[10px] bg-brand-700/60 px-2 py-0.5 rounded font-mono">Health Connect</span>
+            </a>
+          </div>
+        )}
+
         <div className="mt-4 text-center">
-          <span className="text-[11px] text-slate-600">Kult Konnect v0.1.0 • Built with Capacitor</span>
+          <span className="text-[11px] text-slate-600">
+            Kult Konnect v0.1.0 • {Capacitor.isNativePlatform() ? 'Android Native (Tier 3)' : 'Web / PWA'}
+          </span>
         </div>
       </div>
     </div>
