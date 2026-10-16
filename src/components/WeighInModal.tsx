@@ -5,7 +5,6 @@ import { ScaleLiveStatus, UserProfile, ScaleMeasurement } from '@/types';
 import { calculateBIA, calculateAge } from '@/core/bia/biaEngine';
 import { saveScaleMeasurement } from '@/core/storage/db';
 import { syncMeasurementToHealthConnect } from '@/core/health/healthConnectSync';
-import { matchProfileForWeight } from '@/core/storage/profileMatcher';
 import { PostureSchematic } from './PostureSchematic';
 import { SegmentalWidget } from './SegmentalWidget';
 
@@ -38,6 +37,7 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
   const [finalResult, setFinalResult] = useState<MeasurementResult | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string>(currentProfile.id);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [calculatedBia, setCalculatedBia] = useState<any>(null);
 
   const hasStartedRef = useRef(false);
@@ -67,19 +67,18 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
       async (result: MeasurementResult) => {
         setFinalResult(result);
 
-        // Auto-match user profile based on weight history
-        const match = await matchProfileForWeight(result.weightKg);
-        const matchedId = match.matchedProfile ? match.matchedProfile.id : currentProfile.id;
-        setSelectedProfileId(matchedId);
+        // Prioritize currently active profile; only fall back if none
+        const activeProfileId = currentProfile?.id || (profiles.length > 0 ? profiles[0].id : '');
+        setSelectedProfileId(activeProfileId);
 
         // Calculate BIA using target profile
-        const activeUser = profiles.find((p) => p.id === matchedId) || currentProfile;
-        if (result.hasBodyComp && result.impedanceOhm) {
+        const activeUser = profiles.find((p) => p.id === activeProfileId) || currentProfile;
+        if (result.hasBodyComp && result.impedanceOhm && activeUser) {
           const bia = calculateBIA({
             weightKg: result.weightKg,
-            heightCm: activeUser.heightCm,
-            ageYears: calculateAge(activeUser.birthDate),
-            gender: activeUser.gender,
+            heightCm: activeUser.heightCm || 170,
+            ageYears: calculateAge(activeUser.birthDate || '1995-01-01'),
+            gender: activeUser.gender || 'male',
             impedanceOhm: result.impedanceOhm,
             rawImpedances: result.rawImpedances,
           });
@@ -112,9 +111,9 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
       const activeUser = profiles.find((p) => p.id === newProfileId) || currentProfile;
       const bia = calculateBIA({
         weightKg: finalResult.weightKg,
-        heightCm: activeUser.heightCm,
-        ageYears: calculateAge(activeUser.birthDate),
-        gender: activeUser.gender,
+        heightCm: activeUser?.heightCm || 170,
+        ageYears: calculateAge(activeUser?.birthDate || '1995-01-01'),
+        gender: activeUser?.gender || 'male',
         impedanceOhm: finalResult.impedanceOhm,
         rawImpedances: finalResult.rawImpedances,
       });
@@ -125,21 +124,23 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
   const handleSave = async (syncToHealth: boolean) => {
     if (!finalResult) return;
     setIsSaving(true);
+    setSaveMessage(syncToHealth ? 'Saving & connecting to Health Connect...' : 'Saving locally...');
 
     try {
       const activeUser = profiles.find((p) => p.id === selectedProfileId) || currentProfile;
       const measurementId = `m_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const userHeight = activeUser?.heightCm && activeUser.heightCm > 50 ? activeUser.heightCm : 170;
 
       const measurement: ScaleMeasurement = {
         id: measurementId,
         profileId: activeUser.id,
         timestamp: Date.now(),
-        weightKg: finalResult.weightKg,
+        weightKg: Number(finalResult.weightKg.toFixed(2)),
         impedanceOhm: finalResult.impedanceOhm,
         rawImpedances: finalResult.rawImpedances,
         heartRateBpm: finalResult.heartRateBpm,
         segmental: calculatedBia?.segmental,
-        bmi: calculatedBia?.bmi || Number((finalResult.weightKg / Math.pow(activeUser.heightCm / 100, 2)).toFixed(1)),
+        bmi: calculatedBia?.bmi || Number((finalResult.weightKg / Math.pow(userHeight / 100, 2)).toFixed(1)),
         bodyFatPercent: calculatedBia?.bodyFatPercent,
         musclePercent: calculatedBia?.musclePercent,
         waterPercent: calculatedBia?.waterPercent,
@@ -152,16 +153,29 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
 
       // 1. Save to Dexie.js local database first
       await saveScaleMeasurement(measurement);
+      console.log('[WeighInModal] Measurement saved to Dexie DB:', measurement.id);
 
       // 2. Sync to Health Connect if requested
       if (syncToHealth) {
-        await syncMeasurementToHealthConnect(measurement);
+        setSaveMessage('Syncing to Google Health Connect...');
+        const synced = await syncMeasurementToHealthConnect(measurement);
+        if (synced) {
+          measurement.syncedToHealthConnect = true;
+          setSaveMessage('Synced to Google Health Connect!');
+        } else {
+          setSaveMessage('Saved locally! Health Connect permission or sync failed.');
+        }
+      } else {
+        setSaveMessage('Saved locally!');
       }
 
       onMeasurementSaved(measurement);
+      // Wait 1.2s so user sees clear confirmation
+      await new Promise((r) => setTimeout(r, 1200));
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving measurement:', err);
+      setSaveMessage(`Save error: ${err?.message || 'Failed'}`);
     } finally {
       setIsSaving(false);
     }
@@ -434,6 +448,12 @@ export const WeighInModal: React.FC<WeighInModalProps> = ({
 
         {/* Action Buttons */}
         <div className="w-full flex flex-col gap-2 mt-2">
+          {saveMessage && (
+            <div className="p-2.5 rounded-xl bg-brand-500/15 border border-brand-500/30 text-center text-xs font-medium text-brand-300 animate-in fade-in">
+              {saveMessage}
+            </div>
+          )}
+
           {finalResult ? (
             <>
               <button

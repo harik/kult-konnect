@@ -113,9 +113,9 @@ export async function downloadAndStageOtaUpdate(info: VersionInfo): Promise<bool
       version: info.version,
     });
 
-    // Stage bundle for next app launch
-    await CapacitorUpdater.set(bundle);
-    console.log(`[OTA] Bundle ${info.version} staged successfully!`);
+    // Stage bundle for NEXT app launch without reloading active session
+    await CapacitorUpdater.next(bundle);
+    console.log(`[OTA] Bundle ${info.version} staged for next launch!`);
     return true;
   } catch (err) {
     console.error('[OTA] Download failed:', err);
@@ -130,6 +130,8 @@ export async function autoCheckAndStageUpdate(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   try {
+    // Delay check so initial app launch and profile loading settle
+    await new Promise((r) => setTimeout(r, 4000));
     const status = await checkForOtaUpdate();
     if (status.hasUpdate && status.latestVersion) {
       const endpoint = DEFAULT_UPDATE_URL;

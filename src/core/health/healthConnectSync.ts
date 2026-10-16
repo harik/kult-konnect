@@ -70,13 +70,30 @@ export async function syncMeasurementToHealthConnect(measurement: ScaleMeasureme
       return false;
     }
 
+    // Proactively check and request write permissions if not yet authorized
+    try {
+      const auth = await Health.checkAuthorization({
+        write: ['weight', 'bodyFat', 'basalCalories', 'heartRate'],
+      });
+      if (!auth.writeAuthorized.includes('weight')) {
+        console.log('[Health Sync] Prompting user for Health Connect write permissions...');
+        const granted = await requestHealthPermissions();
+        if (!granted) {
+          console.warn('[Health Sync] User declined or did not grant Health Connect permissions');
+          return false;
+        }
+      }
+    } catch (authErr) {
+      console.warn('[Health Sync] Error checking/requesting authorization:', authErr);
+    }
+
     const dateIso = new Date(measurement.timestamp).toISOString();
 
     // 1. Sync Weight (kg)
     if (measurement.weightKg > 0) {
       await Health.saveSample({
         dataType: 'weight',
-        value: measurement.weightKg,
+        value: Number(measurement.weightKg.toFixed(2)),
         unit: 'kilogram',
         startDate: dateIso,
         endDate: dateIso,
@@ -88,10 +105,11 @@ export async function syncMeasurementToHealthConnect(measurement: ScaleMeasureme
     }
 
     // 2. Sync Body Fat (%)
+    // Health Connect Percentage unit expects 0.0 to 100.0 (e.g. 21.5% is 21.5, not 0.215)
     if (measurement.bodyFatPercent !== undefined && measurement.bodyFatPercent > 0) {
       await Health.saveSample({
         dataType: 'bodyFat',
-        value: measurement.bodyFatPercent / 100, // standard decimal ratio or percentage
+        value: Number(measurement.bodyFatPercent.toFixed(1)),
         unit: 'percent',
         startDate: dateIso,
         endDate: dateIso,
@@ -105,7 +123,7 @@ export async function syncMeasurementToHealthConnect(measurement: ScaleMeasureme
     if (measurement.bmrKcal !== undefined && measurement.bmrKcal > 0) {
       await Health.saveSample({
         dataType: 'basalCalories',
-        value: measurement.bmrKcal,
+        value: Math.round(measurement.bmrKcal),
         unit: 'kilocalorie',
         startDate: dateIso,
         endDate: dateIso,
@@ -113,13 +131,16 @@ export async function syncMeasurementToHealthConnect(measurement: ScaleMeasureme
     }
 
     // 4. Sync Resting Heart Rate (BPM)
+    // NOTE: HeartRateRecord is an IntervalRecord in Health Connect: startTime MUST be strictly before endTime!
     if (measurement.heartRateBpm !== undefined && measurement.heartRateBpm > 0) {
+      const startMs = measurement.timestamp;
+      const endMs = startMs + 1000; // 1 second duration required by Android IntervalRecord
       await Health.saveSample({
         dataType: 'heartRate',
-        value: measurement.heartRateBpm,
+        value: Math.round(measurement.heartRateBpm),
         unit: 'bpm',
-        startDate: dateIso,
-        endDate: dateIso,
+        startDate: new Date(startMs).toISOString(),
+        endDate: new Date(endMs).toISOString(),
         metadata: {
           kultKonnectId: measurement.id,
           source: 'Cult Smart Scale Pro BCG',

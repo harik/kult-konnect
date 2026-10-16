@@ -245,7 +245,12 @@ export function App() {
           driver={activeDriver}
           currentProfile={activeProfile}
           profiles={profiles}
-          onMeasurementSaved={() => {}}
+          onMeasurementSaved={(savedMeasurement) => {
+            const targetProfile = profiles.find((p) => p.id === savedMeasurement.profileId);
+            if (targetProfile && targetProfile.id !== activeProfile.id) {
+              setActiveProfile(targetProfile);
+            }
+          }}
         />
       )}
 
